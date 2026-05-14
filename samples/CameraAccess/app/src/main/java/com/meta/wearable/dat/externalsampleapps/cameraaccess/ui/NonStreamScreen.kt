@@ -29,8 +29,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -65,6 +68,9 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
 import kotlinx.coroutines.launch
 
+private val UpdateRequiredBackground = Color(0xFFFFF4D6)
+private val UpdateRequiredForeground = Color(0xFF8A4B00)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NonStreamScreen(
@@ -76,7 +82,8 @@ fun NonStreamScreen(
   val gettingStartedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val scope = rememberCoroutineScope()
   var dropdownExpanded by remember { mutableStateOf(false) }
-  val isDisconnectEnabled = uiState.registrationState is RegistrationState.Registered
+  val isDisconnectEnabled = uiState.registrationState == RegistrationState.REGISTERED
+  val isUpdateRequired = uiState.isFirmwareUpdateRequired || uiState.isDatAppUpdateRequired
   val activity = LocalActivity.current
   val context = LocalContext.current
 
@@ -144,12 +151,12 @@ fun NonStreamScreen(
       Column(
           modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
           horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         if (!uiState.hasActiveDevice) {
           Row(
               horizontalArrangement = Arrangement.spacedBy(8.dp),
               verticalAlignment = Alignment.CenterVertically,
-              modifier = Modifier.padding(bottom = 12.dp),
           ) {
             Icon(
                 painter = painterResource(id = R.drawable.hourglass_icon),
@@ -165,11 +172,38 @@ fun NonStreamScreen(
           }
         }
 
+        if (isUpdateRequired) {
+          UpdateRequiredMessage(
+              showFirmwareUpdate = uiState.isFirmwareUpdateRequired,
+              showDatAppUpdate = uiState.isDatAppUpdateRequired,
+          )
+        }
+
+        if (uiState.isFirmwareUpdateRequired) {
+          SwitchButton(
+              label = stringResource(R.string.update_firmware_button_title),
+              onClick = {
+                activity?.let { viewModel.openFirmwareUpdate(it) }
+                    ?: Toast.makeText(context, "Activity not available", Toast.LENGTH_SHORT).show()
+              },
+          )
+        }
+
+        if (uiState.isDatAppUpdateRequired) {
+          SwitchButton(
+              label = stringResource(R.string.update_dat_app_button_title),
+              onClick = {
+                activity?.let { viewModel.openDATGlassesAppUpdate(it) }
+                    ?: Toast.makeText(context, "Activity not available", Toast.LENGTH_SHORT).show()
+              },
+          )
+        }
+
         // Start Streaming Button
         SwitchButton(
             label = stringResource(R.string.stream_button_title),
             onClick = { viewModel.navigateToStreaming(onRequestWearablesPermission) },
-            enabled = uiState.hasActiveDevice,
+            enabled = uiState.hasActiveDevice && !isUpdateRequired,
         )
       }
 
@@ -189,6 +223,55 @@ fun NonStreamScreen(
           )
         }
       }
+    }
+  }
+}
+
+@Composable
+private fun UpdateRequiredMessage(
+    showFirmwareUpdate: Boolean,
+    showDatAppUpdate: Boolean,
+    modifier: Modifier = Modifier,
+) {
+  val message =
+      when {
+        showFirmwareUpdate && showDatAppUpdate ->
+            stringResource(R.string.update_required_both_message)
+        showFirmwareUpdate -> stringResource(R.string.update_required_firmware_message)
+        else -> stringResource(R.string.update_required_dat_app_message)
+      }
+
+  Row(
+      modifier =
+          modifier
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(20.dp))
+              .background(UpdateRequiredBackground)
+              .padding(16.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.Top,
+  ) {
+    Icon(
+        imageVector = Icons.Default.Warning,
+        contentDescription = null,
+        tint = UpdateRequiredForeground,
+        modifier = Modifier.size(24.dp),
+    )
+    Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+      Text(
+          text = stringResource(R.string.update_required_title),
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+          color = UpdateRequiredForeground,
+      )
+      Text(
+          text = message,
+          style = MaterialTheme.typography.bodyMedium,
+          color = UpdateRequiredForeground,
+      )
     }
   }
 }

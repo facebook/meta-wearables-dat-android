@@ -1,98 +1,99 @@
 ---
-description: Device session states, pause/resume, availability monitoring
+description: Session state, stream state, pause and resume behavior, and device availability monitoring
 globs: **/*Session*, **/*Lifecycle*
 ---
 
-
 # Session Lifecycle (Android)
 
-Guide for managing device session states in DAT SDK integrations.
+Manage session and stream state in DAT SDK integrations.
 
-## Overview
-
-The DAT SDK runs work inside sessions. Meta glasses expose two experience types:
-- **Device sessions** — sustained access to device sensors and outputs
-- **Transactions** — short, system-owned interactions (notifications, "Hey Meta")
-
-Your app observes session state changes — the device decides when to transition.
+Create a `Session` with `Wearables.createSession(...)`, start it, then attach capabilities such as camera streaming. Session lifecycle and stream lifecycle are related but distinct.
 
 ## Session states
 
 | State | Meaning | App action |
 |-------|---------|------------|
-| `STOPPED` | Session inactive, not reconnecting | Free resources, wait for user action |
-| `RUNNING` | Session active, streaming data | Perform live work |
-| `PAUSED` | Temporarily suspended | Hold work, may resume |
+| `IDLE` | Session created, not started yet | Call `session.start()` |
+| `STARTING` | Connecting to the device | Show loading UI |
+| `STARTED` | Session active and ready for capabilities | Add or use capabilities |
+| `PAUSED` | Session temporarily suspended | Keep state, wait for resume or stop |
+| `STOPPING` | Session is shutting down | Stop user work and wait |
+| `STOPPED` | Session ended | Release resources and create a new session if needed |
 
-## Observing session state
+## Observe session state
 
 ```kotlin
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
 lifecycleScope.launch {
-    Wearables.getDeviceSessionState(deviceId).collect { state ->
+    session.state.collect { state ->
         when (state) {
-            SessionState.RUNNING -> onRunning()
-            SessionState.PAUSED -> onPaused()
-            SessionState.STOPPED -> onStopped()
+            DeviceSessionState.STARTED -> onStarted()
+            DeviceSessionState.PAUSED -> onPaused()
+            DeviceSessionState.STOPPED -> onStopped()
+            else -> Unit
         }
     }
 }
 ```
 
-## StreamSession state transitions
+## Stream state
+
+Camera streaming has its own state flow after you attach a stream:
 
 ```text
-STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
+STOPPED -> STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
 ```
 
 ```kotlin
 lifecycleScope.launch {
-    session.state.collect { state ->
-        // React to state changes
+    stream.state.collect { state ->
+        // React to camera capability state changes
     }
 }
 ```
 
 ## Common transitions
 
-The device changes session state when:
-- User performs a system gesture that opens another experience
-- Another app starts a device session
-- User removes or folds the glasses (Bluetooth disconnects)
-- User removes the app from Meta AI companion app
-- Connectivity between companion app and glasses drops
+The SDK may pause or stop a session when:
+
+- Another experience takes over the device
+- The user removes or folds the glasses
+- Bluetooth connectivity drops
+- The user unregisters the app or revokes needed access
 
 ## Pause and resume
 
 When a session is paused:
-- The device keeps the connection alive
-- Streams stop delivering data
-- The device may resume by returning to `RUNNING`
 
-Your app should **not** attempt to restart while paused — wait for `RUNNING` or `STOPPED`.
+- The device connection may remain active
+- Attached capabilities stop doing useful work
+- Your app should wait for the next observed session state instead of trying to force a restart
 
 ## Device availability
 
 ```kotlin
 lifecycleScope.launch {
     Wearables.devices.collect { devices ->
-        // Update list of available glasses
+        // Update the list of available devices
     }
 }
 ```
 
-Key behaviors:
-- Closing hinges disconnects Bluetooth -> forces `STOPPED`
-- Opening hinges restores Bluetooth but does **not** restart sessions
-- Start a new session after the device becomes available again
+Use `Wearables.devices` and device metadata to decide when it is sensible to create a new session after a stop.
 
-## Implementation checklist
+## Checklist
 
-- [ ] Handle all session states (`RUNNING`, `PAUSED`, `STOPPED`)
-- [ ] Monitor device availability before starting work
-- [ ] Release resources only after `STOPPED`
-- [ ] Don't infer transition causes — rely only on observable state
-- [ ] Don't restart during `PAUSED` — wait for system to resume or stop
+- [ ] Handle all `DeviceSessionState` values you care about
+- [ ] Observe stream state separately from session state
+- [ ] Release resources only after stop or close
+- [ ] Recreate sessions after terminal stops instead of reusing dead ones
+- [ ] Surface typed `SessionError` and `StreamError` failures
 
 ## Links
 
 - [Session lifecycle documentation](https://wearables.developer.meta.com/docs/lifecycle-events)
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)

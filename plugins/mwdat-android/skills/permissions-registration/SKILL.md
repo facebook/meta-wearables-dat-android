@@ -1,0 +1,100 @@
+---
+name: permissions-registration
+description: App registration with Meta AI and device permission flows
+---
+
+# Permissions & Registration (Android)
+
+Register your app with Meta AI, then request the device permissions it needs.
+
+The DAT SDK separates two steps:
+
+1. **Registration**: The user connects your app to Meta AI.
+2. **Device permissions**: After registration, your app requests capabilities such as camera access.
+
+Both flows depend on the Meta AI app being installed on the phone.
+
+## Start registration
+
+```kotlin
+Wearables.startRegistration(activity)
+```
+
+Observe registration state:
+
+```kotlin
+lifecycleScope.launch {
+    Wearables.registrationState.collect { state ->
+        // Update your registration UI
+    }
+}
+```
+
+To unregister:
+
+```kotlin
+Wearables.startUnregistration(activity)
+```
+
+## Check permission status
+
+`checkPermissionStatus(...)` is a suspend API that returns a `DatResult`.
+
+```kotlin
+lifecycleScope.launch {
+    Wearables.checkPermissionStatus(Permission.CAMERA)
+        .onSuccess { status ->
+            if (status == PermissionStatus.Granted) {
+                startStreaming()
+            }
+        }
+        .onFailure { error, _ ->
+            showPermissionError(error.description)
+        }
+}
+```
+
+## Request a permission
+
+Use `Wearables.RequestPermissionContract()` with the Activity Result API:
+
+```kotlin
+private val permissionLauncher =
+    registerForActivityResult(Wearables.RequestPermissionContract()) { result ->
+        result.onSuccess { status ->
+            if (status == PermissionStatus.Granted) {
+                startStreaming()
+            }
+        }.onFailure { error, _ ->
+            showPermissionError(error.description)
+        }
+    }
+
+fun requestCameraPermission() {
+    permissionLauncher.launch(Permission.CAMERA)
+}
+```
+
+Users can allow once or allow always through the Meta AI flow.
+
+## Developer Mode vs production
+
+| Mode | Registration behavior |
+|------|------------------------|
+| Developer Mode | Use `APPLICATION_ID = 0` for local development |
+| Production | Use the application ID assigned in the Wearables Developer Center |
+
+For development builds, enable Developer Mode in the Meta AI app before testing registration and permissions.
+
+## Prerequisites
+
+- Internet connection for registration
+- Meta AI app installed on the phone
+- Callback URI scheme configured in `AndroidManifest.xml`
+- Bluetooth permission granted on Android
+
+## Links
+
+- [Permissions documentation](https://wearables.developer.meta.com/docs/permissions-requests)
+- [Manage projects](https://wearables.developer.meta.com/docs/manage-projects)
+- [Android integration guide](https://wearables.developer.meta.com/docs/build-integration-android)

@@ -1,118 +1,100 @@
 ---
-description: App registration with Meta AI, camera permission flows
+description: App registration with Meta AI and device permission flows
 globs: **/*Permission*, **/*Registration*
 ---
 
-
 # Permissions & Registration (Android)
 
-Guide for app registration and camera permission flows in the DAT SDK.
+Register your app with Meta AI, then request the device permissions it needs.
 
-## Overview
+The DAT SDK separates two steps:
 
-The DAT SDK separates two concepts:
-1. **Registration** — Your app registers with Meta AI to become a permitted integration
-2. **Device permissions** — After registration, request specific device permissions (e.g., camera)
+1. **Registration**: The user connects your app to Meta AI.
+2. **Device permissions**: After registration, your app requests capabilities such as camera access.
 
-All permission grants occur through the Meta AI companion app.
+Both flows depend on the Meta AI app being installed on the phone.
 
-## Registration flow
-
-### Start registration
+## Start registration
 
 ```kotlin
-Wearables.startRegistration(context)
+Wearables.startRegistration(activity)
 ```
 
-This opens the Meta AI app where the user approves your app.
-
-### Observe registration state
+Observe registration state:
 
 ```kotlin
 lifecycleScope.launch {
     Wearables.registrationState.collect { state ->
-        when (state) {
-            is RegistrationState.Registered -> {
-                // App is registered, can request permissions
-            }
-            is RegistrationState.Unregistered -> {
-                // App is not registered
-            }
-        }
+        // Update your registration UI
     }
 }
 ```
 
-### Unregister
+To unregister:
 
 ```kotlin
-Wearables.startUnregistration(context)
+Wearables.startUnregistration(activity)
 ```
 
-## Camera permissions
+## Check permission status
 
-### Check permission status
+`checkPermissionStatus(...)` is a suspend API that returns a `DatResult`.
 
 ```kotlin
-val status = Wearables.checkPermissionStatus(Permission.CAMERA)
-if (status == PermissionStatus.Granted) {
-    // Start streaming
+lifecycleScope.launch {
+    Wearables.checkPermissionStatus(Permission.CAMERA)
+        .onSuccess { status ->
+            if (status == PermissionStatus.Granted) {
+                startStreaming()
+            }
+        }
+        .onFailure { error, _ ->
+            showPermissionError(error.description)
+        }
 }
 ```
 
-### Request permission
+## Request a permission
 
-Use the SDK's `RequestPermissionContract` with the Activity Result API:
+Use `Wearables.RequestPermissionContract()` with the Activity Result API:
 
 ```kotlin
-private var permissionContinuation: CancellableContinuation<PermissionStatus>? = null
-private val permissionMutex = Mutex()
-
-private val permissionsResultLauncher =
+private val permissionLauncher =
     registerForActivityResult(Wearables.RequestPermissionContract()) { result ->
-        permissionContinuation?.resume(result)
-        permissionContinuation = null
-    }
-
-suspend fun requestWearablesPermission(permission: Permission): PermissionStatus {
-    return permissionMutex.withLock {
-        suspendCancellableCoroutine { continuation ->
-            permissionContinuation = continuation
-            continuation.invokeOnCancellation { permissionContinuation = null }
-            permissionsResultLauncher.launch(permission)
+        result.onSuccess { status ->
+            if (status == PermissionStatus.Granted) {
+                startStreaming()
+            }
+        }.onFailure { error, _ ->
+            showPermissionError(error.description)
         }
     }
+
+fun requestCameraPermission() {
+    permissionLauncher.launch(Permission.CAMERA)
 }
 ```
 
-Users can choose:
-- **Allow once** — temporary, single-session grant
-- **Allow always** — persistent grant
+Users can allow once or allow always through the Meta AI flow.
 
-## Multi-device behavior
-
-Users can link multiple glasses to Meta AI. The SDK handles this transparently:
-- Permission granted on **any** linked device means your app has access
-- You don't need to track which device has permissions
-- If all devices disconnect, permissions become unavailable
-
-## Developer Mode vs Production
+## Developer Mode vs production
 
 | Mode | Registration behavior |
-|------|----------------------|
-| Developer Mode | Registration always allowed (use `APPLICATION_ID` = `0`) |
-| Production | Users must be in proper release channel |
+|------|------------------------|
+| Developer Mode | Use `APPLICATION_ID = 0` for local development |
+| Production | Use the application ID assigned in the Wearables Developer Center |
 
-For production, get your `APPLICATION_ID` from the [Wearables Developer Center](https://wearables.developer.meta.com/).
+For development builds, enable Developer Mode in the Meta AI app before testing registration and permissions.
 
 ## Prerequisites
 
-- Registration requires an internet connection
-- Meta AI companion app must be installed
-- For Developer Mode: enable in Meta AI > Settings > Your glasses > Developer Mode
+- Internet connection for registration
+- Meta AI app installed on the phone
+- Callback URI scheme configured in `AndroidManifest.xml`
+- Bluetooth permission granted on Android
 
 ## Links
 
 - [Permissions documentation](https://wearables.developer.meta.com/docs/permissions-requests)
-- [Getting started guide](https://wearables.developer.meta.com/docs/getting-started-toolkit)
 - [Manage projects](https://wearables.developer.meta.com/docs/manage-projects)
+- [Android integration guide](https://wearables.developer.meta.com/docs/build-integration-android)

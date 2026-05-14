@@ -4,6 +4,8 @@
     <!-- Home Screen -->
     <string name="register_button_title" description="Connect App">Connect my glasses</string>
     <string name="unregister_button_title" description="Disconnect App">Disconnect</string>
+    <string name="update_firmware_button_title" description="Open firmware update">Update firmware</string>
+    <string name="update_dat_app_button_title" description="Open DAT app update on glasses">Update app on glasses</string>
     <string name="stream_button_title" description="Start streaming">Start streaming</string>
     <string name="stop_stream_button_title" description="Stop streaming">Stop streaming</string>
     <string name="home_tip_video_title" description="Tip title about video capture">Video Capture</string>
@@ -22,6 +24,10 @@
     <string name="non_stream_screen_description" description="Non stream screen description">Tap the Start streaming button to stream video from your glasses or use the camera button to take a photo from your glasses.</string>
     <string name="non_stream_screen_title" description="Non stream screen title">Stream Your Glasses Camera</string>
     <string name="waiting_for_active_device" description="Waiting for active device message">Waiting for an active device</string>
+    <string name="update_required_title" description="Update required warning title">Update required</string>
+    <string name="update_required_firmware_message" description="Firmware update required warning">Your glasses firmware needs an update before Camera Access can start.</string>
+    <string name="update_required_dat_app_message" description="DAT app update required warning">The app on your glasses needs an update before Camera Access can start.</string>
+    <string name="update_required_both_message" description="Firmware and DAT app update required warning">Your glasses firmware and app need updates before Camera Access can start.</string>
 
     <!-- SharePhotoDialog -->
     <string name="photo_captured" description="Photo Captured">Photo Captured</string>
@@ -59,6 +65,12 @@
     <string name="power" description="Power toggle label">Power</string>
     <string name="donned" description="Donned toggle label">Donned</string>
     <string name="unfolded" description="Unfolded toggle label">Unfolded</string>
+
+    <!-- Camera Permission Alert -->
+    <string name="camera_permission_alert_title" description="Camera permission alert title">Camera Access Required</string>
+    <string name="camera_permission_alert_message" description="Camera permission alert message">Camera access was denied. Please enable it in Settings to use the camera source.</string>
+    <string name="camera_permission_open_settings" description="Camera permission open settings button">Open Settings</string>
+    <string name="camera_permission_cancel" description="Camera permission cancel button">Cancel</string>
 
     <!-- Getting Started Sheet -->
     <string name="getting_started_title" description="Getting Started sheet title">Getting started</string>

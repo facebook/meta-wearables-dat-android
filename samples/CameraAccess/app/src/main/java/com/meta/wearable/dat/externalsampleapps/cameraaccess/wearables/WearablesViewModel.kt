@@ -23,6 +23,7 @@ import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.core.selectors.DeviceSelector
+import com.meta.wearable.dat.core.types.DeviceCompatibility
 import com.meta.wearable.dat.core.types.DeviceIdentifier
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
@@ -36,10 +37,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class WearablesViewModel(application: Application) : AndroidViewModel(application) {
-  companion object {
-    private const val TAG = "WearablesViewModel"
-  }
-
   private val _uiState = MutableStateFlow(WearablesUiState())
   val uiState: StateFlow<WearablesUiState> = _uiState.asStateFlow()
 
@@ -49,6 +46,7 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
 
   private var monitoringStarted = false
   private val deviceMonitoringJobs = mutableMapOf<DeviceIdentifier, Job>()
+  private val deviceCompatibility = mutableMapOf<DeviceIdentifier, DeviceCompatibility>()
 
   private fun startMonitoring() {
     if (monitoringStarted) {
@@ -57,19 +55,18 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
     monitoringStarted = true
 
     // Monitor device selector for active device
-    deviceSelectorJob =
-        viewModelScope.launch {
-          deviceSelector.activeDeviceFlow().collect { device ->
-            _uiState.update { it.copy(hasActiveDevice = device != null) }
-          }
-        }
+    deviceSelectorJob = viewModelScope.launch {
+      deviceSelector.activeDeviceFlow().collect { device ->
+        _uiState.update { it.copy(hasActiveDevice = device != null) }
+      }
+    }
 
     // This allows the app to react to registration changes (registered, unregistered, etc.)
     viewModelScope.launch {
       Wearables.registrationState.collect { value ->
         val previousState = _uiState.value.registrationState
         val showGettingStartedSheet =
-            value is RegistrationState.Registered && previousState is RegistrationState.Registering
+            value == RegistrationState.REGISTERED && previousState == RegistrationState.REGISTERING
         _uiState.update {
           it.copy(registrationState = value, isGettingStartedSheetVisible = showGettingStartedSheet)
         }
@@ -91,23 +88,23 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
     removedDevices.forEach { deviceId ->
       deviceMonitoringJobs[deviceId]?.cancel()
       deviceMonitoringJobs.remove(deviceId)
+      deviceCompatibility.remove(deviceId)
     }
+    updateFirmwareUpdateRequired()
 
     // Start monitoring jobs only for new devices (not already being monitored)
     val newDevices = devices - deviceMonitoringJobs.keys
     newDevices.forEach { deviceId ->
-      val job =
-          viewModelScope.launch {
-            Wearables.devicesMetadata[deviceId]?.collect { metadata ->
-              if (
-                  metadata.compatibility ==
-                      com.meta.wearable.dat.core.types.DeviceCompatibility.DEVICE_UPDATE_REQUIRED
-              ) {
-                val deviceName = metadata.name.ifEmpty { deviceId }
-                setRecentError("Device '$deviceName' requires an update to work with this app")
-              }
-            }
+      val job = viewModelScope.launch {
+        Wearables.devicesMetadata[deviceId]?.collect { metadata ->
+          deviceCompatibility[deviceId] = metadata.compatibility
+          updateFirmwareUpdateRequired()
+          if (metadata.compatibility == DeviceCompatibility.DEVICE_UPDATE_REQUIRED) {
+            val deviceName = metadata.name.ifEmpty { deviceId }
+            setRecentError("Device '$deviceName' requires an update to work with this app")
           }
+        }
+      }
       deviceMonitoringJobs[deviceId] = job
     }
   }
@@ -118,6 +115,18 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun startUnregistration(activity: Activity) {
     Wearables.startUnregistration(activity)
+  }
+
+  fun openFirmwareUpdate(activity: Activity) {
+    Wearables.openFirmwareUpdate(activity).onFailure { error, _ ->
+      setRecentError(error.description)
+    }
+  }
+
+  fun openDATGlassesAppUpdate(activity: Activity) {
+    Wearables.openDATGlassesAppUpdate(activity).onFailure { error, _ ->
+      setRecentError(error.description)
+    }
   }
 
   fun navigateToStreaming(onRequestWearablesPermission: suspend (Permission) -> PermissionStatus) {
@@ -166,8 +175,12 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
     _uiState.update { it.copy(recentError = null) }
   }
 
-  private fun setRecentError(error: String) {
+  internal fun setRecentError(error: String) {
     _uiState.update { it.copy(recentError = error) }
+  }
+
+  internal fun setDatAppUpdateRequired(required: Boolean) {
+    _uiState.update { it.copy(isDatAppUpdateRequired = required) }
   }
 
   fun onPermissionsResult(permissionsResult: Map<String, Boolean>, onAllGranted: () -> Unit) {
@@ -197,5 +210,11 @@ class WearablesViewModel(application: Application) : AndroidViewModel(applicatio
     deviceMonitoringJobs.values.forEach { it.cancel() }
     deviceMonitoringJobs.clear()
     deviceSelectorJob?.cancel()
+  }
+
+  private fun updateFirmwareUpdateRequired() {
+    val isRequired =
+        deviceCompatibility.values.any { it == DeviceCompatibility.DEVICE_UPDATE_REQUIRED }
+    _uiState.update { it.copy(isFirmwareUpdateRequired = isRequired) }
   }
 }

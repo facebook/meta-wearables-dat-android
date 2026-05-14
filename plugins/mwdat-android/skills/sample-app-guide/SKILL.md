@@ -1,0 +1,118 @@
+---
+name: sample-app-guide
+description: Building a complete DAT app with session creation, camera streaming, and photo capture
+---
+
+# Sample App Guide (Android)
+
+Build an Android DAT app with registration, sessions, camera streaming, and photo capture.
+
+Pair this with the [CameraAccess sample](https://github.com/facebook/meta-wearables-dat-android/tree/main/samples).
+
+## Project setup
+
+1. Create an Android Studio app project.
+2. Add the DAT Maven repository and dependencies.
+3. Configure `AndroidManifest.xml` for registration callbacks and `APPLICATION_ID`.
+4. Initialize `Wearables` in your `Application`.
+
+## Suggested app structure
+
+```text
+app/src/main/java/com/example/myapp/
+├── MyApplication.kt
+├── MainActivity.kt
+├── session/
+│   └── SessionViewModel.kt
+└── ui/
+    ├── RegistrationScreen.kt
+    └── CameraScreen.kt
+```
+
+## Registration and session creation
+
+```kotlin
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        lifecycleScope.launch {
+            Wearables.registrationState.collect { state ->
+                // Update registration UI
+            }
+        }
+    }
+
+    fun register() {
+        Wearables.startRegistration(this)
+    }
+}
+```
+
+```kotlin
+class SessionViewModel : ViewModel() {
+    private var session: Session? = null
+    private var stream: Stream? = null
+
+    fun startCameraSession() {
+        val createdSession = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+            throw IllegalStateException(error.description)
+        }
+        createdSession.start()
+        session = createdSession
+
+        stream = createdSession.addStream(
+            StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 24),
+        ).getOrElse { error ->
+            throw IllegalStateException(error.description)
+        }.also { addedStream ->
+            addedStream.start().getOrElse { error ->
+                throw IllegalStateException(error.description)
+            }
+        }
+    }
+}
+```
+
+## Observe frames and capture photos
+
+```kotlin
+viewModelScope.launch {
+    stream?.videoStream?.collect { frame ->
+        // Render preview
+    }
+}
+
+fun capturePhoto() {
+    viewModelScope.launch {
+        stream?.capturePhoto()
+            ?.onSuccess { photoData ->
+                savePhoto(photoData.data)
+            }
+            ?.onFailure { error, _ ->
+                showCaptureError(error.description)
+            }
+    }
+}
+```
+
+## Shutdown
+
+```kotlin
+fun stopCameraSession() {
+    stream?.stop()
+    session?.stop()
+    stream = null
+    session = null
+}
+```
+
+## Testing with MockDeviceKit
+
+Use `MockDeviceKit` to simulate linking glasses, permission state, and camera media without physical hardware. See [MockDevice Testing](mockdevice-testing.md) for setup details.
+
+## Links
+
+- [CameraAccess sample](https://github.com/facebook/meta-wearables-dat-android/tree/main/samples)
+- [Android integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
+- [Developer documentation](https://wearables.developer.meta.com/docs/develop/)

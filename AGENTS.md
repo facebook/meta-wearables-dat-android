@@ -1,95 +1,122 @@
 # Meta Wearables DAT SDK
 
 > Full API reference: https://wearables.developer.meta.com/llms.txt?full=true
+> DAT docs MCP: https://mcp.facebook.com/wearables_dat
 > Developer docs: https://wearables.developer.meta.com/docs/develop/
 
 ## Code style
 
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Build app | `./gradlew assembleDebug` |
+| Run tests | `./gradlew test` |
+| Install app | `./gradlew installDebug` |
+| Lint app | `./gradlew lint` |
 
 ## Architecture
 
-The SDK is organized into three modules:
-- **mwdat-core**: Device discovery, registration, permissions, device selectors
-- **mwdat-camera**: StreamSession, VideoFrame, photo capture
+The SDK is organized into four public modules:
+
+- **mwdat-core**: Registration, permissions, devices, and session creation
+- **mwdat-camera**: Stream capability, video frames, and photo capture
+- **mwdat-display**: Display capability, display UI components, icons, images, buttons, and video
 - **mwdat-mockdevice**: MockDeviceKit for testing without hardware
 
-## Kotlin Patterns
-
-- Use `suspend` functions for async operations — no callbacks
-- Use `StateFlow` / `Flow` for observing state changes
-- Use `DatResult<T, E>` for error handling — not exceptions
-- Prefer immutable collections
-- Use `sealed interface` for state hierarchies
-
-## Error Handling
-
-The SDK uses `DatResult<T, E>` for type-safe error handling:
+### Initialization and session setup
 
 ```kotlin
-val result = Wearables.someOperation()
-result.fold(
-    onSuccess = { value -> /* handle success */ },
-    onFailure = { error -> /* handle error */ }
-)
+Wearables.initialize(context)
 
-// Or partial handling:
-result.onSuccess { value -> /* handle success */ }
-result.onFailure { error -> /* handle error */ }
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
+val stream = session.addStream(StreamConfiguration()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+stream.start().getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
 ```
 
-Do **not** use `getOrThrow()` — always handle both paths.
+## Kotlin patterns
 
-## Naming Conventions
+- Use `DatResult<T, E>` for typed success and failure handling
+- Observe state with `StateFlow` and `Flow`
+- Create a `Session` first, then attach capabilities such as `Stream` or `Display`
+- Keep frame handling off the main thread when doing heavier processing
 
-| Suffix | Purpose | Example |
-|--------|---------|---------|
-| `*Manager` | Long-lived resource management | `RegistrationManager` |
-| `*Session` | Short-lived flow component | `StreamSession` |
-| `*Result` | DatResult type aliases | `RegistrationResult` |
-| `*Error` | Error sealed interfaces | `WearablesError` |
-
-Methods: `get*`, `set*`, `check*`, `request*`, `observe*`
-
-## Imports
+## Error handling
 
 ```kotlin
-import com.meta.wearable.dat.core.Wearables          // Entry point
-import com.meta.wearable.dat.camera.StreamSession     // Camera streaming
-import com.meta.wearable.dat.camera.types.*            // VideoFrame, PhotoData, etc.
+Wearables.checkPermissionStatus(Permission.CAMERA)
+    .onSuccess { status -> /* handle status */ }
+    .onFailure { error, _ -> /* handle error */ }
 ```
 
-For testing:
+Avoid `getOrThrow()` in user-facing samples. Surface typed errors from `DatResult` instead.
+
+## Naming conventions
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| `Session` | Device connection lifecycle | `Wearables.createSession(...)` |
+| `Stream` | Camera capability on a session | `session.addStream(...)` |
+| `Display` | Display capability on a session | `session.addDisplay(...)` |
+| `*Selector` | Device targeting | `AutoDeviceSelector` |
+| `*Error` | Typed failure surface | `SessionError`, `StreamError` |
+
+## Key types
+
+- `Wearables` — SDK entry point
+- `Session` — lifecycle for an interaction with a linked device
+- `Stream` — camera capability attached to a session
+- `Display` — display capability attached to a session
+- `StreamConfiguration` — video quality and frame rate configuration
+- `MockDeviceKit` — simulated device environment for testing
+
+## Live docs search
+
+If your editor supports remote MCP servers, connect `https://mcp.facebook.com/wearables_dat` and use `search_dat_docs` for current DAT setup, session lifecycle, camera streaming, MockDeviceKit, permissions, and exact API symbols.
+
+Use `llms.txt` when your tool only supports static reference context.
+
+## Testing with MockDeviceKit
+
 ```kotlin
-import com.meta.wearable.dat.mockdevice.MockDeviceKit  // MockDeviceKit
+val mockDeviceKit = MockDeviceKit.getInstance(context)
+mockDeviceKit.enable()
+val device = mockDeviceKit.pairRaybanMeta()
 ```
 
-## Key Types
+Use MockDeviceKit to drive registration, device availability, streaming media, and permission scenarios without physical hardware.
 
-- `Wearables` — SDK entry point. Call `Wearables.initialize(context)` at startup
-- `StreamSession` — Camera streaming session
-- `VideoFrame` — Individual video frame with bitmap data
-- `AutoDeviceSelector` — Auto-selects the best available device
-- `SpecificDeviceSelector` — Selects a specific device by identifier
-- `StreamConfiguration` — Configure video quality, frame rate
-- `MockDeviceKit` — Factory for creating simulated devices in tests
+## Common pitfalls
+
+- Do not call SDK APIs before `Wearables.initialize(context)`
+- Do not assume a session implies streaming or display access; capabilities are attached separately
+- Do not ignore `DatResult` failures from `createSession`, `start`, `addStream`, `addDisplay`, or `capturePhoto`
+- Do not reuse terminally stopped sessions
 
 ## Links
 
-- [Android API Reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6)
-- [Developer Documentation](https://wearables.developer.meta.com/docs/develop/)
-- [GitHub Repository](https://github.com/facebook/meta-wearables-dat-android)
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
+- [Developer documentation](https://wearables.developer.meta.com/docs/develop/)
+- [GitHub repository](https://github.com/facebook/meta-wearables-dat-android)
 
 ## Dev environment tips
 
-
-Guide for setting up the Meta Wearables Device Access Toolkit in an Android app.
+Set up the Meta Wearables Device Access Toolkit in an Android app.
 
 ## Prerequisites
 
-- Android Studio, minSdk 26+
-- Meta AI companion app installed on test device
-- Ray-Ban Meta glasses or Meta Ray-Ban Display glasses (or use MockDeviceKit for development)
-- Developer Mode enabled in Meta AI app (Settings > Your glasses > Developer Mode)
+- Android Studio Flamingo or newer
+- Android 10+ test device with the Meta AI app installed
+- Supported Meta glasses or MockDeviceKit for local testing
+- Developer Mode enabled in the Meta AI app for development builds
 - GitHub personal access token with `read:packages` scope
 
 ## Step 1: Add the Maven repository
@@ -126,7 +153,7 @@ In `libs.versions.toml`:
 
 ```toml
 [versions]
-mwdat = "0.6.0"
+mwdat = "0.7.0"
 
 [libraries]
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
@@ -144,16 +171,14 @@ dependencies {
 }
 ```
 
-## Step 3: Configure AndroidManifest.xml
+## Step 3: Configure `AndroidManifest.xml`
 
 ```xml
 <manifest ...>
-    <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application ...>
-        <!-- Use 0 in Developer Mode; production apps get ID from Wearables Developer Center -->
         <meta-data
             android:name="com.meta.wearable.mwdat.APPLICATION_ID"
             android:value="0" />
@@ -170,7 +195,7 @@ dependencies {
 </manifest>
 ```
 
-Replace `myexampleapp` with your app's URL scheme.
+Use `0` for `APPLICATION_ID` in Developer Mode. Replace `myexampleapp` with your app's URL scheme.
 
 ## Step 4: Initialize the SDK
 
@@ -181,74 +206,75 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Wearables.initialize(this)
+            .onFailure { error, _ -> error("Failed to initialize DAT: ${error.description}") }
     }
 }
 ```
 
-Calling SDK APIs before initialization yields `WearablesError.NOT_INITIALIZED`.
-
-## Step 5: Register with Meta AI
+## Step 5: Register and create a session
 
 ```kotlin
-fun startRegistration(context: Context) {
-    Wearables.startRegistration(context)
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
+
+fun connect(activity: Activity) {
+    Wearables.startRegistration(activity)
+}
+
+fun startSession() {
+    val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+        throw IllegalStateException(error.description)
+    }
+
+    session.start()
 }
 ```
 
-Observe registration state:
+Observe registration and available devices:
 
 ```kotlin
 lifecycleScope.launch {
     Wearables.registrationState.collect { state ->
-        // Update UI based on registration state
+        // Update registration UI
+    }
+}
+
+lifecycleScope.launch {
+    Wearables.devices.collect { devices ->
+        // Update the device list
     }
 }
 ```
 
-## Step 6: Start streaming
+## Step 6: Add camera streaming
 
 ```kotlin
-import com.meta.wearable.dat.camera.StreamSession
+import com.meta.wearable.dat.camera.addStream
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.VideoQuality
-import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 
-val session = Wearables.startStreamSession(
-    context = context,
-    deviceSelector = AutoDeviceSelector(),
-    streamConfiguration = StreamConfiguration(
-        videoQuality = VideoQuality.MEDIUM,
-        frameRate = 24,
-    ),
-)
-
-lifecycleScope.launch {
-    session.videoStream.collect { frame ->
-        // Display frame
-    }
+val stream = session.addStream(
+    StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 24),
+).getOrElse { error ->
+    throw IllegalStateException(error.description)
 }
 
-lifecycleScope.launch {
-    session.state.collect { state ->
-        // Update UI based on stream state
-    }
+stream.start().onFailure { error, _ ->
+    throw IllegalStateException(error.description)
 }
 ```
 
 ## Next steps
 
-- [Camera Streaming](camera-streaming.md) — Resolution, frame rate, photo capture
+- [Camera Streaming](camera-streaming.md) — Stream capability, video frames, photo capture
 - [MockDevice Testing](mockdevice-testing.md) — Test without hardware
-- [Session Lifecycle](session-lifecycle.md) — Handle pause/resume/stop
-- [Permissions](permissions-registration.md) — Camera permission flows
-- [Full documentation](https://wearables.developer.meta.com/docs/develop/)
+- [Session Lifecycle](session-lifecycle.md) — Handle session and stream state changes
+- [Permissions](permissions-registration.md) — Registration and permission flows
+- [Full Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
 
 ## Testing instructions
 
-
-Guide for testing DAT SDK integrations without physical Meta glasses.
-
-## Overview
+Use MockDeviceKit to test DAT SDK integrations without physical Meta glasses.
 
 MockDeviceKit simulates Meta glasses behavior for development and testing. It provides:
 - `MockDeviceKit` — Entry point for creating simulated devices
@@ -297,6 +323,22 @@ device.don()    // Simulate wearing the glasses
 device.doff()   // Simulate removing
 device.fold()
 device.powerOff()
+```
+
+## Configuring permissions
+
+MockDeviceKit provides `permissions` to control permission behavior without the Meta AI app.
+
+By default, `RequestPermissionContract` returns `Granted`. Use `set()` to control `checkPermissionStatus()` and `setRequestResult()` to control request outcomes.
+
+```kotlin
+val mockDeviceKit = MockDeviceKit.getInstance(context)
+
+// Simulate denied camera permission status
+mockDeviceKit.permissions.set(Permission.CAMERA, PermissionStatus.Denied)
+
+// Simulate denied request result (user tapping "deny")
+mockDeviceKit.permissions.setRequestResult(Permission.CAMERA, PermissionStatus.Denied)
 ```
 
 ## Setting up mock camera feeds
@@ -390,31 +432,42 @@ The CameraAccess sample app includes a Debug menu for MockDeviceKit:
 
 ## Building and streaming
 
-
-Guide for implementing camera streaming and photo capture with the DAT SDK.
+Use a `Session` and attached `Stream` to receive frames and capture photos.
 
 ## Key concepts
 
-- **StreamSession**: Main interface for camera streaming
-- **VideoFrame**: Individual video frames from the stream
-- **StreamConfiguration**: Configure resolution, frame rate
-- **PhotoData**: Still image captured from glasses
+- **Session**: Device connection lifecycle created through `Wearables.createSession(...)`
+- **Stream**: Camera capability attached to a session with `session.addStream(...)`
+- **StreamConfiguration**: Resolution and frame rate configuration for the stream
+- **PhotoData**: Still image captured from glasses while streaming
 
-## Creating a StreamSession
+## Create a session and attach a stream
 
 ```kotlin
+import com.meta.wearable.dat.camera.Stream
+import com.meta.wearable.dat.camera.addStream
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.VideoQuality
+import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 
-val session = Wearables.startStreamSession(
-    context = context,
-    deviceSelector = AutoDeviceSelector(),
-    streamConfiguration = StreamConfiguration(
-        videoQuality = VideoQuality.MEDIUM,  // 504x896
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
+val stream: Stream = session.addStream(
+    StreamConfiguration(
+        videoQuality = VideoQuality.MEDIUM,
         frameRate = 24,
     ),
-)
+).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+
+stream.start().getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
 ```
 
 ### Resolution options
@@ -429,393 +482,342 @@ val session = Wearables.startStreamSession(
 
 Valid values: `2`, `7`, `15`, `24`, `30` FPS.
 
-Lower resolution and frame rate yield higher visual quality due to less Bluetooth compression.
+Lower resolution and frame rate usually produce better visual quality per frame over Bluetooth.
 
-## Observing stream state
+## Observe stream state
 
-`StreamSessionState` transitions: `STARTING` -> `STARTED` -> `STREAMING` -> `STOPPING` -> `STOPPED` -> `CLOSED`
+`StreamState` transitions: `STOPPED` -> `STARTING` -> `STARTED` -> `STREAMING` -> `STOPPING` -> `STOPPED` -> `CLOSED`
 
 ```kotlin
 lifecycleScope.launch {
-    session.state.collect { state ->
+    stream.state.collect { state ->
         when (state) {
-            StreamSessionState.STREAMING -> {
-                // Stream is active, frames flowing
+            StreamState.STREAMING -> {
+                // Frames are flowing
             }
-            StreamSessionState.STOPPED -> {
-                // Stream ended, release resources
+            StreamState.STOPPED -> {
+                // Streaming ended
             }
-            StreamSessionState.CLOSED -> {
-                // Session fully closed
+            StreamState.CLOSED -> {
+                // Stream fully closed
             }
-            else -> { /* handle other states */ }
+            else -> Unit
         }
     }
 }
 ```
 
-## Receiving video frames
+## Receive frames
 
 ```kotlin
 lifecycleScope.launch {
-    session.videoStream.collect { frame ->
-        // Display frame bitmap
+    stream.videoStream.collect { frame ->
         updatePreview(frame)
     }
 }
 ```
 
-## Photo capture
+## Capture a photo
 
 ```kotlin
-session.capturePhoto()
-    .onSuccess { photoData ->
-        // Handle captured photo data
-        val imageBytes = photoData.data
-    }
-    .onFailure { error ->
-        // Handle capture error
-    }
+lifecycleScope.launch {
+    stream.capturePhoto()
+        .onSuccess { photoData ->
+            val imageBytes = photoData.data
+            savePhoto(imageBytes)
+        }
+        .onFailure { error, _ ->
+            showCaptureError(error.description)
+        }
+}
 ```
 
-## Bandwidth and quality
+## Clean up
 
-Resolution and frame rate are constrained by Bluetooth Classic bandwidth. The SDK automatically reduces quality when bandwidth is limited:
-1. First lowers resolution (e.g., HIGH -> MEDIUM)
-2. Then reduces frame rate (e.g., 30 -> 24), never below 15 FPS
-
-Request lower settings for higher visual quality per frame.
-
-## Device selection
+Stop the stream when you no longer need camera data, then stop the parent session if the device interaction is finished.
 
 ```kotlin
-// Auto-select best available device
-val auto = AutoDeviceSelector()
-
-// Select specific device
-val specific = SpecificDeviceSelector(deviceIdentifier = deviceId)
+stream.stop()
+session.stop()
 ```
+
+If you want to remove the capability entirely before re-adding it, call `session.removeStream()`.
 
 ## Links
 
-- [StreamSession API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6/com_meta_wearable_dat_camera_streamsession)
-- [StreamConfiguration API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6/com_meta_wearable_dat_camera_types_streamconfiguration)
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
 - [Integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
 
 ## Session management
 
+Manage session and stream state in DAT SDK integrations.
 
-Guide for managing device session states in DAT SDK integrations.
-
-## Overview
-
-The DAT SDK runs work inside sessions. Meta glasses expose two experience types:
-- **Device sessions** — sustained access to device sensors and outputs
-- **Transactions** — short, system-owned interactions (notifications, "Hey Meta")
-
-Your app observes session state changes — the device decides when to transition.
+Create a `Session` with `Wearables.createSession(...)`, start it, then attach capabilities such as camera streaming. Session lifecycle and stream lifecycle are related but distinct.
 
 ## Session states
 
 | State | Meaning | App action |
 |-------|---------|------------|
-| `STOPPED` | Session inactive, not reconnecting | Free resources, wait for user action |
-| `RUNNING` | Session active, streaming data | Perform live work |
-| `PAUSED` | Temporarily suspended | Hold work, may resume |
+| `IDLE` | Session created, not started yet | Call `session.start()` |
+| `STARTING` | Connecting to the device | Show loading UI |
+| `STARTED` | Session active and ready for capabilities | Add or use capabilities |
+| `PAUSED` | Session temporarily suspended | Keep state, wait for resume or stop |
+| `STOPPING` | Session is shutting down | Stop user work and wait |
+| `STOPPED` | Session ended | Release resources and create a new session if needed |
 
-## Observing session state
+## Observe session state
 
 ```kotlin
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
 lifecycleScope.launch {
-    Wearables.getDeviceSessionState(deviceId).collect { state ->
+    session.state.collect { state ->
         when (state) {
-            SessionState.RUNNING -> onRunning()
-            SessionState.PAUSED -> onPaused()
-            SessionState.STOPPED -> onStopped()
+            DeviceSessionState.STARTED -> onStarted()
+            DeviceSessionState.PAUSED -> onPaused()
+            DeviceSessionState.STOPPED -> onStopped()
+            else -> Unit
         }
     }
 }
 ```
 
-## StreamSession state transitions
+## Stream state
+
+Camera streaming has its own state flow after you attach a stream:
 
 ```text
-STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
+STOPPED -> STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
 ```
 
 ```kotlin
 lifecycleScope.launch {
-    session.state.collect { state ->
-        // React to state changes
+    stream.state.collect { state ->
+        // React to camera capability state changes
     }
 }
 ```
 
 ## Common transitions
 
-The device changes session state when:
-- User performs a system gesture that opens another experience
-- Another app starts a device session
-- User removes or folds the glasses (Bluetooth disconnects)
-- User removes the app from Meta AI companion app
-- Connectivity between companion app and glasses drops
+The SDK may pause or stop a session when:
+
+- Another experience takes over the device
+- The user removes or folds the glasses
+- Bluetooth connectivity drops
+- The user unregisters the app or revokes needed access
 
 ## Pause and resume
 
 When a session is paused:
-- The device keeps the connection alive
-- Streams stop delivering data
-- The device may resume by returning to `RUNNING`
 
-Your app should **not** attempt to restart while paused — wait for `RUNNING` or `STOPPED`.
+- The device connection may remain active
+- Attached capabilities stop doing useful work
+- Your app should wait for the next observed session state instead of trying to force a restart
 
 ## Device availability
 
 ```kotlin
 lifecycleScope.launch {
     Wearables.devices.collect { devices ->
-        // Update list of available glasses
+        // Update the list of available devices
     }
 }
 ```
 
-Key behaviors:
-- Closing hinges disconnects Bluetooth -> forces `STOPPED`
-- Opening hinges restores Bluetooth but does **not** restart sessions
-- Start a new session after the device becomes available again
+Use `Wearables.devices` and device metadata to decide when it is sensible to create a new session after a stop.
 
-## Implementation checklist
+## Checklist
 
-- [ ] Handle all session states (`RUNNING`, `PAUSED`, `STOPPED`)
-- [ ] Monitor device availability before starting work
-- [ ] Release resources only after `STOPPED`
-- [ ] Don't infer transition causes — rely only on observable state
-- [ ] Don't restart during `PAUSED` — wait for system to resume or stop
+- [ ] Handle all `DeviceSessionState` values you care about
+- [ ] Observe stream state separately from session state
+- [ ] Release resources only after stop or close
+- [ ] Recreate sessions after terminal stops instead of reusing dead ones
+- [ ] Surface typed `SessionError` and `StreamError` failures
 
 ## Links
 
 - [Session lifecycle documentation](https://wearables.developer.meta.com/docs/lifecycle-events)
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
 
 ## Permissions
 
+Register your app with Meta AI, then request the device permissions it needs.
 
-Guide for app registration and camera permission flows in the DAT SDK.
+The DAT SDK separates two steps:
 
-## Overview
+1. **Registration**: The user connects your app to Meta AI.
+2. **Device permissions**: After registration, your app requests capabilities such as camera access.
 
-The DAT SDK separates two concepts:
-1. **Registration** — Your app registers with Meta AI to become a permitted integration
-2. **Device permissions** — After registration, request specific device permissions (e.g., camera)
+Both flows depend on the Meta AI app being installed on the phone.
 
-All permission grants occur through the Meta AI companion app.
-
-## Registration flow
-
-### Start registration
+## Start registration
 
 ```kotlin
-Wearables.startRegistration(context)
+Wearables.startRegistration(activity)
 ```
 
-This opens the Meta AI app where the user approves your app.
-
-### Observe registration state
+Observe registration state:
 
 ```kotlin
 lifecycleScope.launch {
     Wearables.registrationState.collect { state ->
-        when (state) {
-            is RegistrationState.Registered -> {
-                // App is registered, can request permissions
-            }
-            is RegistrationState.Unregistered -> {
-                // App is not registered
-            }
-        }
+        // Update your registration UI
     }
 }
 ```
 
-### Unregister
+To unregister:
 
 ```kotlin
-Wearables.startUnregistration(context)
+Wearables.startUnregistration(activity)
 ```
 
-## Camera permissions
+## Check permission status
 
-### Check permission status
+`checkPermissionStatus(...)` is a suspend API that returns a `DatResult`.
 
 ```kotlin
-val status = Wearables.checkPermissionStatus(Permission.CAMERA)
-if (status == PermissionStatus.Granted) {
-    // Start streaming
+lifecycleScope.launch {
+    Wearables.checkPermissionStatus(Permission.CAMERA)
+        .onSuccess { status ->
+            if (status == PermissionStatus.Granted) {
+                startStreaming()
+            }
+        }
+        .onFailure { error, _ ->
+            showPermissionError(error.description)
+        }
 }
 ```
 
-### Request permission
+## Request a permission
 
-Use the SDK's `RequestPermissionContract` with the Activity Result API:
+Use `Wearables.RequestPermissionContract()` with the Activity Result API:
 
 ```kotlin
-private var permissionContinuation: CancellableContinuation<PermissionStatus>? = null
-private val permissionMutex = Mutex()
-
-private val permissionsResultLauncher =
+private val permissionLauncher =
     registerForActivityResult(Wearables.RequestPermissionContract()) { result ->
-        permissionContinuation?.resume(result)
-        permissionContinuation = null
-    }
-
-suspend fun requestWearablesPermission(permission: Permission): PermissionStatus {
-    return permissionMutex.withLock {
-        suspendCancellableCoroutine { continuation ->
-            permissionContinuation = continuation
-            continuation.invokeOnCancellation { permissionContinuation = null }
-            permissionsResultLauncher.launch(permission)
+        result.onSuccess { status ->
+            if (status == PermissionStatus.Granted) {
+                startStreaming()
+            }
+        }.onFailure { error, _ ->
+            showPermissionError(error.description)
         }
     }
+
+fun requestCameraPermission() {
+    permissionLauncher.launch(Permission.CAMERA)
 }
 ```
 
-Users can choose:
-- **Allow once** — temporary, single-session grant
-- **Allow always** — persistent grant
+Users can allow once or allow always through the Meta AI flow.
 
-## Multi-device behavior
-
-Users can link multiple glasses to Meta AI. The SDK handles this transparently:
-- Permission granted on **any** linked device means your app has access
-- You don't need to track which device has permissions
-- If all devices disconnect, permissions become unavailable
-
-## Developer Mode vs Production
+## Developer Mode vs production
 
 | Mode | Registration behavior |
-|------|----------------------|
-| Developer Mode | Registration always allowed (use `APPLICATION_ID` = `0`) |
-| Production | Users must be in proper release channel |
+|------|------------------------|
+| Developer Mode | Use `APPLICATION_ID = 0` for local development |
+| Production | Use the application ID assigned in the Wearables Developer Center |
 
-For production, get your `APPLICATION_ID` from the [Wearables Developer Center](https://wearables.developer.meta.com/).
+For development builds, enable Developer Mode in the Meta AI app before testing registration and permissions.
 
 ## Prerequisites
 
-- Registration requires an internet connection
-- Meta AI companion app must be installed
-- For Developer Mode: enable in Meta AI > Settings > Your glasses > Developer Mode
+- Internet connection for registration
+- Meta AI app installed on the phone
+- Callback URI scheme configured in `AndroidManifest.xml`
+- Bluetooth permission granted on Android
 
 ## Links
 
 - [Permissions documentation](https://wearables.developer.meta.com/docs/permissions-requests)
-- [Getting started guide](https://wearables.developer.meta.com/docs/getting-started-toolkit)
 - [Manage projects](https://wearables.developer.meta.com/docs/manage-projects)
+- [Android integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
 
 ## Debugging
 
-
-Guide for diagnosing common issues with DAT SDK integrations.
+Diagnose common setup, session, and stream issues in DAT SDK integrations.
 
 ## Quick diagnosis
 
 ```text
-Device not connecting?
+No eligible device or session won't start?
 |
-+-- Is Developer Mode enabled? -> Enable in Meta AI app settings
++-- Did you call Wearables.initialize(context)? -> Must happen before SDK usage
 |
-+-- Is device registered? -> Check registrationState
++-- Did registration complete? -> Observe Wearables.registrationState
 |
-+-- Is device in range? -> Bluetooth on, glasses powered on
++-- Is Developer Mode enabled? -> Enable it in the Meta AI app for dev builds
 |
-+-- Did you call initialize()? -> Must call Wearables.initialize(context) first
++-- Does Wearables.devices contain a linked device? -> Check Bluetooth and range
 |
-+-- Stream not receiving frames? -> Check device connection state
++-- Did createSession() or addStream() return a DatResult failure? -> Surface the typed error
 ```
 
 ## Developer Mode
 
-Developer Mode must be enabled for 3P apps to access device features.
+Developer Mode must be enabled for local development builds that use `APPLICATION_ID = 0`.
 
-### Enabling Developer Mode
+### Symptoms when Developer Mode is disabled
 
-1. Open Meta AI app on phone
-2. Go to Settings -> (Your connected glasses)
-3. Find "Developer Mode" toggle
-4. Toggle ON
-5. Device may restart
+- Registration flow completes but the device never becomes eligible
+- Permission requests do not succeed for development builds
+- `Wearables.createSession(...)` fails with no eligible device
 
-### Symptoms of Developer Mode disabled
+### Watch for
 
-- Registration completes but device never connects
-- StreamSession stuck without streaming
-- Permission requests fail or never appear
+- Developer Mode may reset after app or firmware updates
+- Developer Mode is configured per linked device
+- Production builds use a real `APPLICATION_ID` and release-channel gating instead
 
-### Common gotchas
+## Session and stream issues
 
-- Developer Mode toggles **off** after firmware updates — re-enable it
-- Developer Mode is per-device — enable for each glasses pair
-- Some features need additional permissions beyond Developer Mode
+### Session never reaches `STARTED`
 
-## StreamSession state issues
+- Verify `Wearables.registrationState`
+- Check that `Wearables.devices` contains a compatible linked device
+- Ensure the glasses are powered on, unfolded, and in range
 
-### Expected flow
+### Stream never reaches `STREAMING`
 
-```text
-STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
-```
+- Confirm `session.start()` succeeded before calling `session.addStream(...)`
+- Check camera permission status through `Wearables.checkPermissionStatus(...)`
+- Make sure `stream.start()` returned success
 
-### Not receiving frames
+### Photo capture fails
 
-- Check that `Wearables.initialize(context)` was called
-- Verify device is connected and in range
-- Ensure camera permission was granted
-- Check that the device selector matches an available device
-
-### Unexpected stop
-
-- Device disconnected (out of range, battery died)
-- Channel closed by device
-- Error in frame processing
+- `capturePhoto()` only succeeds while the stream is actively streaming
+- Surface the returned `CaptureError` instead of discarding the `DatResult`
 
 ## Version compatibility
 
-Ensure compatible versions of SDK, Meta AI app, and glasses firmware:
+Ensure compatible versions of the SDK, Meta AI app, and glasses firmware. See [version dependencies](https://wearables.developer.meta.com/docs/version-dependencies) for the current compatibility matrix.
 
-| SDK | Meta AI App | Ray-Ban Meta | Meta Ray-Ban Display |
-|-----|-------------|--------------|----------------------|
-| 0.6.0 | Check [version dependencies](https://wearables.developer.meta.com/docs/version-dependencies) | Check docs | Check docs |
-| 0.4.0 | V254 | V20 | V21 |
-| 0.3.0 | V249 | V20 | — |
-
-## Known issues
-
-| Issue | Workaround |
-|-------|-----------|
-| No internet -> registration fails | Internet required for registration |
-| Streams started with glasses doffed pause when donned | Unpause by tapping side of glasses |
-| `DeviceSession` unreliable with camera stream | Avoid using `DeviceSession` |
-
-## Adding debug logging
+## Logging
 
 ```kotlin
-import android.util.Log
-
 private const val TAG = "DATWearables"
 
-// In your streaming code:
-Log.d(TAG, "Stream state changed to: $state")
-Log.e(TAG, "Stream error", exception)
+stream.start()
+    .onFailure { error, _ -> Log.e(TAG, "Failed to start stream: ${error.description}") }
 ```
+
+Prefer logging typed `DatResult` failures and observed state transitions over generic exceptions.
 
 ## Checklist
 
-- [ ] `Wearables.initialize(context)` called before any API use
-- [ ] Developer Mode enabled in Meta AI app
-- [ ] Meta AI app updated to compatible version
-- [ ] Glasses firmware updated to compatible version
-- [ ] Internet connection available for registration
-- [ ] Bluetooth permissions granted (`BLUETOOTH_CONNECT`)
-- [ ] Correct URL scheme in AndroidManifest.xml intent filter
-- [ ] `APPLICATION_ID` meta-data set in manifest
+- [ ] `Wearables.initialize(context)` ran before SDK usage
+- [ ] Developer Mode enabled for development builds
+- [ ] `APPLICATION_ID` matches the build mode
+- [ ] Registration completed before session creation
+- [ ] Bluetooth permission granted
+- [ ] Camera permission granted through Meta AI
+- [ ] Session and stream `DatResult` failures are surfaced in logs or UI
 
 ## Links
 
@@ -825,108 +827,31 @@ Log.e(TAG, "Stream error", exception)
 
 ## Sample app
 
+Build an Android DAT app with registration, sessions, camera streaming, and photo capture.
 
-Guide for building a complete DAT SDK app with camera streaming and photo capture.
-
-## Overview
-
-This guide walks through building an Android app that connects to Meta glasses, streams video, and captures photos. Use it as a reference alongside the [CameraAccess sample](https://github.com/facebook/meta-wearables-dat-android/tree/main/samples).
+Pair this with the [CameraAccess sample](https://github.com/facebook/meta-wearables-dat-android/tree/main/samples).
 
 ## Project setup
 
-1. Create a new Android Studio project (Compose Activity)
-2. Add the Maven repository in `settings.gradle.kts`
-3. Add `mwdat-core`, `mwdat-camera`, `mwdat-mockdevice` dependencies
-4. Configure `AndroidManifest.xml` (see [Getting Started](getting-started.md))
+1. Create an Android Studio app project.
+2. Add the DAT Maven repository and dependencies.
+3. Configure `AndroidManifest.xml` for registration callbacks and `APPLICATION_ID`.
+4. Initialize `Wearables` in your `Application`.
 
-## App architecture
-
-A typical DAT app has these components:
+## Suggested app structure
 
 ```text
 app/src/main/java/com/example/myapp/
-├── MyApplication.kt                # Application class, SDK init
-├── MainActivity.kt                 # Registration, permission handling
-├── stream/
-│   └── StreamViewModel.kt          # Streaming, photo capture
+├── MyApplication.kt
+├── MainActivity.kt
+├── session/
+│   └── SessionViewModel.kt
 └── ui/
-    ├── RegistrationScreen.kt       # Registration UI
-    └── StreamScreen.kt             # Video preview, capture
+    ├── RegistrationScreen.kt
+    └── CameraScreen.kt
 ```
 
-## SDK initialization
-
-```kotlin
-import com.meta.wearable.dat.core.Wearables
-
-class MyApplication : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        Wearables.initialize(this)
-    }
-}
-```
-
-## Stream ViewModel
-
-```kotlin
-import com.meta.wearable.dat.camera.types.StreamConfiguration
-import com.meta.wearable.dat.camera.types.StreamSessionState
-import com.meta.wearable.dat.camera.types.VideoQuality
-import com.meta.wearable.dat.core.Wearables
-import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-
-class StreamViewModel : ViewModel() {
-    private val _streamState = MutableStateFlow<StreamSessionState?>(null)
-    val streamState = _streamState.asStateFlow()
-
-    private var session: StreamSession? = null
-
-    fun startStream(context: Context) {
-        val streamSession = Wearables.startStreamSession(
-            context = context,
-            deviceSelector = AutoDeviceSelector(),
-            streamConfiguration = StreamConfiguration(
-                videoQuality = VideoQuality.MEDIUM,
-                frameRate = 24,
-            ),
-        )
-        session = streamSession
-
-        viewModelScope.launch {
-            streamSession.state.collect { state ->
-                _streamState.value = state
-            }
-        }
-
-        viewModelScope.launch {
-            streamSession.videoStream.collect { frame ->
-                // Update UI with frame
-            }
-        }
-    }
-
-    fun stopStream() {
-        session?.stop()
-        session = null
-    }
-
-    fun capturePhoto() {
-        session?.capturePhoto()
-            ?.onSuccess { photoData ->
-                // Handle photo
-            }
-            ?.onFailure { error ->
-                // Handle error
-            }
-    }
-}
-```
-
-## Registration handling
+## Registration and session creation
 
 ```kotlin
 class MainActivity : ComponentActivity() {
@@ -938,65 +863,183 @@ class MainActivity : ComponentActivity() {
                 // Update registration UI
             }
         }
-
-        lifecycleScope.launch {
-            Wearables.devices.collect { devices ->
-                // Update device list
-            }
-        }
     }
 
     fun register() {
         Wearables.startRegistration(this)
     }
+}
+```
 
-    fun unregister() {
-        Wearables.startUnregistration(this)
+```kotlin
+class SessionViewModel : ViewModel() {
+    private var session: Session? = null
+    private var stream: Stream? = null
+
+    fun startCameraSession() {
+        val createdSession = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+            throw IllegalStateException(error.description)
+        }
+        createdSession.start()
+        session = createdSession
+
+        stream = createdSession.addStream(
+            StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 24),
+        ).getOrElse { error ->
+            throw IllegalStateException(error.description)
+        }.also { addedStream ->
+            addedStream.start().getOrElse { error ->
+                throw IllegalStateException(error.description)
+            }
+        }
     }
+}
+```
+
+## Observe frames and capture photos
+
+```kotlin
+viewModelScope.launch {
+    stream?.videoStream?.collect { frame ->
+        // Render preview
+    }
+}
+
+fun capturePhoto() {
+    viewModelScope.launch {
+        stream?.capturePhoto()
+            ?.onSuccess { photoData ->
+                savePhoto(photoData.data)
+            }
+            ?.onFailure { error, _ ->
+                showCaptureError(error.description)
+            }
+    }
+}
+```
+
+## Shutdown
+
+```kotlin
+fun stopCameraSession() {
+    stream?.stop()
+    session?.stop()
+    stream = null
+    session = null
 }
 ```
 
 ## Testing with MockDeviceKit
 
-```kotlin
-import com.meta.wearable.dat.mockdevice.MockDeviceKit
-import com.meta.wearable.dat.mockdevice.api.MockDeviceKitConfig
-
-fun setupMockDevice(context: Context) {
-    val mockDeviceKit = MockDeviceKit.getInstance(context)
-
-    // Attach fake implementations (auto-initializes Wearables if needed).
-    // Starts Registered by default. Pass MockDeviceKitConfig(initiallyRegistered = false)
-    // to start in unregistered state for testing registration flows.
-    mockDeviceKit.enable()
-
-    val device = mockDeviceKit.pairRaybanMeta()
-    device.powerOn()
-    device.unfold()
-    device.don()
-
-    // Set up mock camera feed
-    val camera = device.services.camera
-    camera.setCameraFeed(videoUri)
-}
-
-fun tearDownMockDevice(context: Context) {
-    val mockDeviceKit = MockDeviceKit.getInstance(context)
-    // Unpairs all mock devices, clears pairedDevices, restores real stack
-    mockDeviceKit.disable()
-}
-```
-
-## Allowed dependencies
-
-Your DAT app should only depend on:
-- `mwdat-core` — always required
-- `mwdat-camera` — for camera streaming
-- `mwdat-mockdevice` — for testing
+Use `MockDeviceKit` to simulate linking glasses, permission state, and camera media without physical hardware. See [MockDevice Testing](mockdevice-testing.md) for setup details.
 
 ## Links
 
 - [CameraAccess sample](https://github.com/facebook/meta-wearables-dat-android/tree/main/samples)
-- [Full integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
+- [Android integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
 - [Developer documentation](https://wearables.developer.meta.com/docs/develop/)
 
+## Display Access
+
+Add `mwdat-display` when rendering content on Meta Ray-Ban Display glasses. Display apps also need the core DAT setup from getting-started and permissions-registration: initialize DAT once, complete registration, request Bluetooth and Internet permissions, configure DAT manifest metadata, and set `com.meta.wearable.mwdat.DAM_ENABLED` to `true`.
+
+```toml
+mwdat-display = { group = "com.meta.wearable", name = "mwdat-display", version.ref = "mwdat" }
+```
+
+```kotlin
+dependencies {
+    implementation(libs.mwdat.core)
+    implementation(libs.mwdat.display)
+}
+```
+
+Set `mwdat_application_id` and `mwdat_client_token` from manifest placeholders or `local.properties`, as in the DisplayAccess sample. Request runtime permissions before `Wearables.initialize(context)`. Observe `Wearables.registrationState` and `Wearables.registrationErrorStream`; wait for `RegistrationState.REGISTERED` before creating a display session.
+
+For a picker, collect `Wearables.devices` and per-device `Wearables.devicesMetadata[id]`. Show the device name, `device.deviceType.description`, `device.linkState`, `device.compatibility`, and `device.isDisplayCapable()`. Enable selection only for connected display-capable devices, surface `DeviceCompatibility.DEVICE_UPDATE_REQUIRED` with `Wearables.openFirmwareUpdate(activity)`, and use `SpecificDeviceSelector(selectedDeviceId)` for the selected row. Use `AutoDeviceSelector(filter = { it.isDisplayCapable() })` only when automatic selection is acceptable.
+
+Attach Display only after the `DeviceSession` reaches `STARTED`, and enable user content only once the Display capability reaches `DisplayState.STARTED`. Observe `session.errors`; `DeviceSession.start()` returns `Unit`. If session creation or `session.errors` reports `DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED`, show an update action that calls `Wearables.openDATGlassesAppUpdate(activity)`.
+
+```kotlin
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.selectors.SpecificDeviceSelector
+import com.meta.wearable.dat.core.session.DeviceSessionState
+import com.meta.wearable.dat.core.types.DeviceIdentifier
+import com.meta.wearable.dat.core.types.DeviceSessionError
+import com.meta.wearable.dat.core.types.RegistrationState
+import com.meta.wearable.dat.display.Display
+import com.meta.wearable.dat.display.addDisplay
+import com.meta.wearable.dat.display.types.DisplayState
+import com.meta.wearable.dat.display.views.ButtonStyle
+import com.meta.wearable.dat.display.views.FlexBoxBackground
+import com.meta.wearable.dat.display.views.IconName
+import com.meta.wearable.dat.display.views.TextStyle
+
+fun startDisplaySession(selectedDeviceId: DeviceIdentifier) {
+    if (Wearables.registrationState.value != RegistrationState.REGISTERED) {
+        showError("Register with Meta AI before starting Display")
+        return
+    }
+
+    val session =
+        Wearables.createSession(SpecificDeviceSelector(selectedDeviceId)).fold(
+            onSuccess = { it },
+            onFailure = { error, _ ->
+                if (error == DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED) {
+                    showDatAppUpdateAction()
+                }
+                showError(error.description)
+                return
+            },
+        )
+    var display: Display? = null
+
+    lifecycleScope.launch {
+        session.errors.collect { error ->
+            if (error == DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED) {
+                showDatAppUpdateAction()
+            }
+            showError(error.description)
+        }
+    }
+
+    lifecycleScope.launch {
+        session.state.collect { state ->
+            if (state == DeviceSessionState.STARTED && display == null) {
+                session.addDisplay()
+                    .onSuccess { newDisplay ->
+                        display = newDisplay
+                        lifecycleScope.launch {
+                            newDisplay.state.collect { displayState ->
+                                setTryItEnabled(displayState == DisplayState.STARTED)
+                                if (displayState == DisplayState.STARTED) {
+                                    newDisplay.sendContent {
+                                        flexBox(
+                                            gap = 12,
+                                            padding = 24,
+                                            background = FlexBoxBackground.CARD,
+                                        ) {
+                                            text("Bike ride", style = TextStyle.HEADING)
+                                            button(
+                                                label = "Done",
+                                                style = ButtonStyle.PRIMARY,
+                                                iconName = IconName.CHECKMARK,
+                                                onClick = { showDoneState() },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .onFailure { error, _ -> showError(error.description) }
+            }
+        }
+    }
+    session.start()
+}
+```
+
+Build exactly one root view per `sendContent` call: use a root `flexBox { ... }` for UI, or a root `video(player = player)` for video. Do not put `video(...)` inside a `flexBox`. Button and clickable `flexBox` callbacks are routed back to the phone app; keep callbacks fast and delegate to app state or ViewModel methods. Use `IconName` enum values such as `IconName.GEAR`, not raw strings.
+
+For URL video, create `VideoPlayer(source = VideoSource.Url(...), codec = VideoCodec.MP4)`, send it with `display.sendContent { video(player = player) }`, and call `player.play()` after send success. Collect `player.state` and `player.error`; on `VideoPlayerState.ENDED`, cancel the video observer and send the next display screen. On cleanup, cancel state/error collection jobs, close or replace active video players, call `session.removeDisplay()`, then stop the session.

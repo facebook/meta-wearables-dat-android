@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2" project="displayaccess">
+
+    <string name="app_name" description="App name">Display Access</string>
+    <string name="settings_title" description="Settings screen title">Settings</string>
+    <string name="system_section" description="System section title">System</string>
+    <string name="devices_section" description="Devices section title">Devices</string>
+    <string name="samples_tab" description="Samples tab label">Samples</string>
+    <string name="settings_tab" description="Settings tab label">Settings</string>
+    <string name="no_devices_found" description="No devices text">No devices found</string>
+    <string name="device_preparing" description="Preparing device status">Preparing</string>
+
+    <!-- Connect Screen -->
+    <string name="connect_title" description="Connect screen title">Connect</string>
+    <string name="register_button" description="Register button">Connect my glasses</string>
+    <string name="unregister_button" description="Unregister button">Disconnect</string>
+    <string name="update_firmware_button" description="Open firmware update">Update firmware</string>
+    <string name="update_dat_app_button" description="Open DAT app update on glasses">Update app on glasses</string>
+    <string name="compatibility_issue_title" description="Compatibility issue title">Compatibility issue</string>
+    <string name="compatibility_issue_firmware_message" description="Firmware compatibility issue message">Your glasses firmware needs an update before Display Access can start.</string>
+    <string name="compatibility_issue_dat_app_message" description="DAT app compatibility issue message">The app on your glasses needs an update before Display Access can start.</string>
+    <string name="compatibility_issue_both_message" description="Firmware and DAT app compatibility issue message">Your glasses firmware and app need updates before Display Access can start.</string>
+
+    <!-- Registration States -->
+    <string name="status_unavailable" description="Unavailable state">Unavailable</string>
+    <string name="status_available" description="Available state">Available</string>
+    <string name="status_registering" description="Registering state">Connecting...</string>
+    <string name="status_unregistering" description="Disconnecting state">Disconnecting...</string>
+    <string name="status_registered" description="Registered state">Registered</string>
+
+    <!-- Device States -->
+    <string name="device_connected" description="Device connected">Connected</string>
+    <string name="device_disconnected" description="Device disconnected">Disconnected</string>
+    <string name="device_update_required" description="Device update required">Update required</string>
+
+    <!-- Samples -->
+    <string name="samples_title" description="Samples list title">Sample apps</string>
+    <string name="sample_car_maintenance" description="Car maintenance sample">Car maintenance guide</string>
+    <string name="sample_car_maintenance_desc" description="Car maintenance description">A sample display experience that guides you through a car maintenance task step by step.</string>
+    <string name="try_it_button" description="Try it button">Try it</string>
+
+</resources>

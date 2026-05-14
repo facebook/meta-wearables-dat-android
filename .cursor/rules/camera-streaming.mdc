@@ -1,35 +1,46 @@
 ---
-description: StreamSession, video frames, photo capture, resolution/frame rate configuration
+description: Session and Stream capability setup, video frames, photo capture, resolution and frame rate configuration
 globs: **/*Stream*, **/*Camera*, **/*Video*
 ---
 
-
 # Camera Streaming (Android)
 
-Guide for implementing camera streaming and photo capture with the DAT SDK.
+Use a `Session` and attached `Stream` to receive frames and capture photos.
 
 ## Key concepts
 
-- **StreamSession**: Main interface for camera streaming
-- **VideoFrame**: Individual video frames from the stream
-- **StreamConfiguration**: Configure resolution, frame rate
-- **PhotoData**: Still image captured from glasses
+- **Session**: Device connection lifecycle created through `Wearables.createSession(...)`
+- **Stream**: Camera capability attached to a session with `session.addStream(...)`
+- **StreamConfiguration**: Resolution and frame rate configuration for the stream
+- **PhotoData**: Still image captured from glasses while streaming
 
-## Creating a StreamSession
+## Create a session and attach a stream
 
 ```kotlin
+import com.meta.wearable.dat.camera.Stream
+import com.meta.wearable.dat.camera.addStream
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.VideoQuality
+import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 
-val session = Wearables.startStreamSession(
-    context = context,
-    deviceSelector = AutoDeviceSelector(),
-    streamConfiguration = StreamConfiguration(
-        videoQuality = VideoQuality.MEDIUM,  // 504x896
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
+val stream: Stream = session.addStream(
+    StreamConfiguration(
+        videoQuality = VideoQuality.MEDIUM,
         frameRate = 24,
     ),
-)
+).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+
+stream.start().getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
 ```
 
 ### Resolution options
@@ -44,75 +55,68 @@ val session = Wearables.startStreamSession(
 
 Valid values: `2`, `7`, `15`, `24`, `30` FPS.
 
-Lower resolution and frame rate yield higher visual quality due to less Bluetooth compression.
+Lower resolution and frame rate usually produce better visual quality per frame over Bluetooth.
 
-## Observing stream state
+## Observe stream state
 
-`StreamSessionState` transitions: `STARTING` -> `STARTED` -> `STREAMING` -> `STOPPING` -> `STOPPED` -> `CLOSED`
+`StreamState` transitions: `STOPPED` -> `STARTING` -> `STARTED` -> `STREAMING` -> `STOPPING` -> `STOPPED` -> `CLOSED`
 
 ```kotlin
 lifecycleScope.launch {
-    session.state.collect { state ->
+    stream.state.collect { state ->
         when (state) {
-            StreamSessionState.STREAMING -> {
-                // Stream is active, frames flowing
+            StreamState.STREAMING -> {
+                // Frames are flowing
             }
-            StreamSessionState.STOPPED -> {
-                // Stream ended, release resources
+            StreamState.STOPPED -> {
+                // Streaming ended
             }
-            StreamSessionState.CLOSED -> {
-                // Session fully closed
+            StreamState.CLOSED -> {
+                // Stream fully closed
             }
-            else -> { /* handle other states */ }
+            else -> Unit
         }
     }
 }
 ```
 
-## Receiving video frames
+## Receive frames
 
 ```kotlin
 lifecycleScope.launch {
-    session.videoStream.collect { frame ->
-        // Display frame bitmap
+    stream.videoStream.collect { frame ->
         updatePreview(frame)
     }
 }
 ```
 
-## Photo capture
+## Capture a photo
 
 ```kotlin
-session.capturePhoto()
-    .onSuccess { photoData ->
-        // Handle captured photo data
-        val imageBytes = photoData.data
-    }
-    .onFailure { error ->
-        // Handle capture error
-    }
+lifecycleScope.launch {
+    stream.capturePhoto()
+        .onSuccess { photoData ->
+            val imageBytes = photoData.data
+            savePhoto(imageBytes)
+        }
+        .onFailure { error, _ ->
+            showCaptureError(error.description)
+        }
+}
 ```
 
-## Bandwidth and quality
+## Clean up
 
-Resolution and frame rate are constrained by Bluetooth Classic bandwidth. The SDK automatically reduces quality when bandwidth is limited:
-1. First lowers resolution (e.g., HIGH -> MEDIUM)
-2. Then reduces frame rate (e.g., 30 -> 24), never below 15 FPS
-
-Request lower settings for higher visual quality per frame.
-
-## Device selection
+Stop the stream when you no longer need camera data, then stop the parent session if the device interaction is finished.
 
 ```kotlin
-// Auto-select best available device
-val auto = AutoDeviceSelector()
-
-// Select specific device
-val specific = SpecificDeviceSelector(deviceIdentifier = deviceId)
+stream.stop()
+session.stop()
 ```
+
+If you want to remove the capability entirely before re-adding it, call `session.removeStream()`.
 
 ## Links
 
-- [StreamSession API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6/com_meta_wearable_dat_camera_streamsession)
-- [StreamConfiguration API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6/com_meta_wearable_dat_camera_types_streamconfiguration)
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
 - [Integration guide](https://wearables.developer.meta.com/docs/build-integration-android)

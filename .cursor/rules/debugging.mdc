@@ -1,114 +1,87 @@
 ---
-description: Common issues, Developer Mode, version compatibility, state machine diagnosis
+description: Common issues, Developer Mode, version compatibility, and session and stream diagnosis
 globs: **/*Debug*, **/*Error*, **/*Log*
 ---
 
-
 # Debugging (Android)
 
-Guide for diagnosing common issues with DAT SDK integrations.
+Diagnose common setup, session, and stream issues in DAT SDK integrations.
 
 ## Quick diagnosis
 
 ```text
-Device not connecting?
+No eligible device or session won't start?
 |
-+-- Is Developer Mode enabled? -> Enable in Meta AI app settings
++-- Did you call Wearables.initialize(context)? -> Must happen before SDK usage
 |
-+-- Is device registered? -> Check registrationState
++-- Did registration complete? -> Observe Wearables.registrationState
 |
-+-- Is device in range? -> Bluetooth on, glasses powered on
++-- Is Developer Mode enabled? -> Enable it in the Meta AI app for dev builds
 |
-+-- Did you call initialize()? -> Must call Wearables.initialize(context) first
++-- Does Wearables.devices contain a linked device? -> Check Bluetooth and range
 |
-+-- Stream not receiving frames? -> Check device connection state
++-- Did createSession() or addStream() return a DatResult failure? -> Surface the typed error
 ```
 
 ## Developer Mode
 
-Developer Mode must be enabled for 3P apps to access device features.
+Developer Mode must be enabled for local development builds that use `APPLICATION_ID = 0`.
 
-### Enabling Developer Mode
+### Symptoms when Developer Mode is disabled
 
-1. Open Meta AI app on phone
-2. Go to Settings -> (Your connected glasses)
-3. Find "Developer Mode" toggle
-4. Toggle ON
-5. Device may restart
+- Registration flow completes but the device never becomes eligible
+- Permission requests do not succeed for development builds
+- `Wearables.createSession(...)` fails with no eligible device
 
-### Symptoms of Developer Mode disabled
+### Watch for
 
-- Registration completes but device never connects
-- StreamSession stuck without streaming
-- Permission requests fail or never appear
+- Developer Mode may reset after app or firmware updates
+- Developer Mode is configured per linked device
+- Production builds use a real `APPLICATION_ID` and release-channel gating instead
 
-### Common gotchas
+## Session and stream issues
 
-- Developer Mode toggles **off** after firmware updates — re-enable it
-- Developer Mode is per-device — enable for each glasses pair
-- Some features need additional permissions beyond Developer Mode
+### Session never reaches `STARTED`
 
-## StreamSession state issues
+- Verify `Wearables.registrationState`
+- Check that `Wearables.devices` contains a compatible linked device
+- Ensure the glasses are powered on, unfolded, and in range
 
-### Expected flow
+### Stream never reaches `STREAMING`
 
-```text
-STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
-```
+- Confirm `session.start()` succeeded before calling `session.addStream(...)`
+- Check camera permission status through `Wearables.checkPermissionStatus(...)`
+- Make sure `stream.start()` returned success
 
-### Not receiving frames
+### Photo capture fails
 
-- Check that `Wearables.initialize(context)` was called
-- Verify device is connected and in range
-- Ensure camera permission was granted
-- Check that the device selector matches an available device
-
-### Unexpected stop
-
-- Device disconnected (out of range, battery died)
-- Channel closed by device
-- Error in frame processing
+- `capturePhoto()` only succeeds while the stream is actively streaming
+- Surface the returned `CaptureError` instead of discarding the `DatResult`
 
 ## Version compatibility
 
-Ensure compatible versions of SDK, Meta AI app, and glasses firmware:
+Ensure compatible versions of the SDK, Meta AI app, and glasses firmware. See [version dependencies](https://wearables.developer.meta.com/docs/version-dependencies) for the current compatibility matrix.
 
-| SDK | Meta AI App | Ray-Ban Meta | Meta Ray-Ban Display |
-|-----|-------------|--------------|----------------------|
-| 0.6.0 | Check [version dependencies](https://wearables.developer.meta.com/docs/version-dependencies) | Check docs | Check docs |
-| 0.4.0 | V254 | V20 | V21 |
-| 0.3.0 | V249 | V20 | — |
-
-## Known issues
-
-| Issue | Workaround |
-|-------|-----------|
-| No internet -> registration fails | Internet required for registration |
-| Streams started with glasses doffed pause when donned | Unpause by tapping side of glasses |
-| `DeviceSession` unreliable with camera stream | Avoid using `DeviceSession` |
-
-## Adding debug logging
+## Logging
 
 ```kotlin
-import android.util.Log
-
 private const val TAG = "DATWearables"
 
-// In your streaming code:
-Log.d(TAG, "Stream state changed to: $state")
-Log.e(TAG, "Stream error", exception)
+stream.start()
+    .onFailure { error, _ -> Log.e(TAG, "Failed to start stream: ${error.description}") }
 ```
+
+Prefer logging typed `DatResult` failures and observed state transitions over generic exceptions.
 
 ## Checklist
 
-- [ ] `Wearables.initialize(context)` called before any API use
-- [ ] Developer Mode enabled in Meta AI app
-- [ ] Meta AI app updated to compatible version
-- [ ] Glasses firmware updated to compatible version
-- [ ] Internet connection available for registration
-- [ ] Bluetooth permissions granted (`BLUETOOTH_CONNECT`)
-- [ ] Correct URL scheme in AndroidManifest.xml intent filter
-- [ ] `APPLICATION_ID` meta-data set in manifest
+- [ ] `Wearables.initialize(context)` ran before SDK usage
+- [ ] Developer Mode enabled for development builds
+- [ ] `APPLICATION_ID` matches the build mode
+- [ ] Registration completed before session creation
+- [ ] Bluetooth permission granted
+- [ ] Camera permission granted through Meta AI
+- [ ] Session and stream `DatResult` failures are surfaced in logs or UI
 
 ## Links
 

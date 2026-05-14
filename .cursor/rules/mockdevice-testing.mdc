@@ -3,12 +3,9 @@ description: MockDeviceKit for testing without physical glasses hardware
 globs: **/*Mock*, **/*Test*
 ---
 
-
 # MockDevice Testing (Android)
 
-Guide for testing DAT SDK integrations without physical Meta glasses.
-
-## Overview
+Use MockDeviceKit to test DAT SDK integrations without physical Meta glasses.
 
 MockDeviceKit simulates Meta glasses behavior for development and testing. It provides:
 - `MockDeviceKit` — Entry point for creating simulated devices
@@ -57,6 +54,22 @@ device.don()    // Simulate wearing the glasses
 device.doff()   // Simulate removing
 device.fold()
 device.powerOff()
+```
+
+## Configuring permissions
+
+MockDeviceKit provides `permissions` to control permission behavior without the Meta AI app.
+
+By default, `RequestPermissionContract` returns `Granted`. Use `set()` to control `checkPermissionStatus()` and `setRequestResult()` to control request outcomes.
+
+```kotlin
+val mockDeviceKit = MockDeviceKit.getInstance(context)
+
+// Simulate denied camera permission status
+mockDeviceKit.permissions.set(Permission.CAMERA, PermissionStatus.Denied)
+
+// Simulate denied request result (user tapping "deny")
+mockDeviceKit.permissions.setRequestResult(Permission.CAMERA, PermissionStatus.Denied)
 ```
 
 ## Setting up mock camera feeds

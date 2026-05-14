@@ -13,10 +13,10 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.stream
 
 import android.graphics.Bitmap
-import com.meta.wearable.dat.camera.types.StreamSessionState
+import com.meta.wearable.dat.camera.types.StreamState
 
 data class StreamUiState(
-    val streamSessionState: StreamSessionState = StreamSessionState.STOPPED,
+    val streamState: StreamState = StreamState.STOPPED,
     val videoFrame: Bitmap? = null,
     val videoFrameCount: Int = 0,
     val capturedPhoto: Bitmap? = null,

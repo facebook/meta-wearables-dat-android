@@ -57,7 +57,6 @@ class InstrumentationTest {
   @Before
   fun setup() {
     grantPermissions()
-    MockDeviceKit.getInstance(targetContext).enable()
   }
 
   @After
@@ -78,6 +77,7 @@ class InstrumentationTest {
   fun showsNonStreamScreenWhenMockPaired() {
     val nonStreamScreenText = targetContext.getString(R.string.non_stream_screen_description)
     val mockDeviceKit = MockDeviceKit.getInstance(targetContext)
+    mockDeviceKit.enable()
     mockDeviceKit.pairRaybanMeta().powerOn()
 
     composeTestRule.waitUntilExactlyOneExists(hasText(nonStreamScreenText), timeoutMillis = 5000)
@@ -116,6 +116,7 @@ class InstrumentationTest {
     )
   }
 
+  // TestRail: C1599889064, C1602923640
   @Test
   fun startThenStopStreaming() {
     val startStreamButtonTitle = targetContext.getString(R.string.stream_button_title)
@@ -125,6 +126,7 @@ class InstrumentationTest {
 
     // Pair mock device and provide fake camera feed and captured image
     val mockDeviceKit = MockDeviceKit.getInstance(targetContext)
+    mockDeviceKit.enable()
     val device = mockDeviceKit.pairRaybanMeta()
     device.powerOn()
     device.don()
@@ -151,6 +153,7 @@ class InstrumentationTest {
     grantPermission("android.permission.BLUETOOTH")
     grantPermission("android.permission.BLUETOOTH_CONNECT")
     grantPermission("android.permission.INTERNET")
+    grantPermission("android.permission.CAMERA")
   }
 
   private fun grantPermission(permission: String) {
@@ -167,10 +170,10 @@ class InstrumentationTest {
   private fun copyAssetToCache(assetName: String): File {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     val assetManager = InstrumentationRegistry.getInstrumentation().context.assets
-    val inputStream = assetManager.open(assetName)
     val outFile = File(context.cacheDir, assetName)
-    FileOutputStream(outFile).use { output -> inputStream.copyTo(output) }
-    inputStream.close()
+    assetManager.open(assetName).use { input ->
+      FileOutputStream(outFile).use { output -> input.copyTo(output) }
+    }
     return outFile
   }
 

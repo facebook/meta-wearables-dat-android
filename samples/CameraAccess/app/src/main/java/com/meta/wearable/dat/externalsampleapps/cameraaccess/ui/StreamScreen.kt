@@ -37,7 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.meta.wearable.dat.camera.types.StreamSessionState
+import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.R
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.stream.StreamViewModel
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
@@ -72,7 +72,7 @@ fun StreamScreen(
         )
       }
     }
-    if (streamUiState.streamSessionState == StreamSessionState.STARTING) {
+    if (streamUiState.streamState == StreamState.STARTING) {
       CircularProgressIndicator(
           modifier = Modifier.align(Alignment.Center),
       )

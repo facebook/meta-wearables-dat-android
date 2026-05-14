@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <path
+      android:fillColor="#5A1C1C"
+      android:pathData="M24,18h60c8.8,0 16,7.2 16,16v40c0,8.8 -7.2,16 -16,16H24c-8.8,0 -16,-7.2 -16,-16V34c0,-8.8 7.2,-16 16,-16z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M30,57c0,-5 4,-9 9,-9h4l6,-7h12l6,7h4c5,0 9,4 9,9v9h-6v-3H36v3h-6zM40,52c-2.8,0 -5,2.2 -5,5v1h38v-1c0,-2.8 -2.2,-5 -5,-5H40zM46,68c0,3.3 -2.7,6 -6,6s-6,-2.7 -6,-6 2.7,-6 6,-6 6,2.7 6,6zM80,68c0,3.3 -2.7,6 -6,6s-6,-2.7 -6,-6 2.7,-6 6,-6 6,2.7 6,6z" />
+</vector>

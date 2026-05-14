@@ -8,6 +8,7 @@ A sample Android application demonstrating integration with Meta Wearables Devic
 - Stream camera feed from the device
 - Capture photos from glasses
 - Share captured photos
+- Open firmware and DAT glasses app update flows when required
 
 ## Prerequisites
 
@@ -37,6 +38,8 @@ A sample Android application demonstrating integration with Meta Wearables Devic
    - Capture photos
    - View and save captured photos
    - Disconnect from the device
+1. If a firmware update is required, tap "Update firmware" from the connection screen.
+1. If session start reports that the app on the glasses is outdated, tap "Update app on glasses" from the connection screen.
 
 ## Troubleshooting
 

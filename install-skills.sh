@@ -1,10 +1,15 @@
 #!/bin/bash
-# (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
 
 # Install DAT SDK AI development config into your project.
 # Usage:
 #   ./install-skills.sh              # Interactive menu (when run with a tty)
-#   ./install-skills.sh claude       # Claude Code only
+#   ./install-skills.sh claude       # Claude Code plugin
+#   ./install-skills.sh codex        # Codex plugin
 #   ./install-skills.sh copilot      # GitHub Copilot only
 #   ./install-skills.sh cursor       # Cursor only
 #   ./install-skills.sh agents       # AGENTS.md only
@@ -17,6 +22,7 @@ REPO="facebook/meta-wearables-dat-android"
 BRANCH="main"
 ARCHIVE_URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.tar.gz"
 EXTRACT_DIR="meta-wearables-dat-android-${BRANCH}"
+PLUGIN_DIR="${EXTRACT_DIR}/plugins/mwdat-android"
 
 safe_cleanup() {
   if [ -z "${EXTRACT_DIR:-}" ]; then
@@ -39,15 +45,35 @@ download_archive() {
   fi
 }
 
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Error: '$1' is not installed or not on PATH." >&2
+    return 1
+  fi
+}
+
 install_claude() {
-  echo "Installing Claude Code config for Android..."
+  echo "Installing Claude Code plugin for Android..."
+  require_command claude
   download_archive
-  if [ -d "${EXTRACT_DIR}/.claude" ]; then
-    mkdir -p .claude
-    cp -R "${EXTRACT_DIR}/.claude/." .claude/
-    echo "Installed .claude/ with $(find .claude -name '*.md' | wc -l | tr -d ' ') files."
+  if [ -d "${PLUGIN_DIR}" ]; then
+    claude plugin install "${PLUGIN_DIR}" || return 1
+    echo "Installed Claude plugin from ${PLUGIN_DIR}."
   else
-    echo "Error: Failed to download .claude/ config." >&2
+    echo "Error: Failed to download Claude plugin payload." >&2
+    return 1
+  fi
+}
+
+install_codex() {
+  echo "Installing Codex plugin for Android..."
+  require_command codex
+  download_archive
+  if [ -d "${PLUGIN_DIR}" ]; then
+    codex plugin install "${PLUGIN_DIR}" || return 1
+    echo "Installed Codex plugin from ${PLUGIN_DIR}."
+  else
+    echo "Error: Failed to download Codex plugin payload." >&2
     return 1
   fi
 }
@@ -92,10 +118,19 @@ install_agents() {
 
 install_all() {
   local failed=0
-  install_claude  || failed=1
+  if command -v claude >/dev/null 2>&1; then
+    install_claude || failed=1
+  else
+    echo "Skipping Claude Code plugin install because 'claude' is not on PATH."
+  fi
+  if command -v codex >/dev/null 2>&1; then
+    install_codex || failed=1
+  else
+    echo "Skipping Codex plugin install because 'codex' is not on PATH."
+  fi
   install_copilot || failed=1
-  install_cursor  || failed=1
-  install_agents  || failed=1
+  install_cursor || failed=1
+  install_agents || failed=1
   if [ "$failed" -eq 1 ]; then
     return 1
   fi
@@ -108,21 +143,23 @@ show_menu() {
   echo ""
   echo "Which tool do you want to install config for?"
   echo ""
-  echo "  1) Claude Code    (.claude/)"
-  echo "  2) GitHub Copilot (.github/)"
-  echo "  3) Cursor         (.cursor/)"
-  echo "  4) AGENTS.md      (universal — Codex, Gemini CLI, Devin, Windsurf, etc.)"
-  echo "  5) All tools"
-  echo "  6) Cancel"
+  echo "  1) Claude Code plugin"
+  echo "  2) Codex plugin"
+  echo "  3) GitHub Copilot (.github/)"
+  echo "  4) Cursor         (.cursor/)"
+  echo "  5) AGENTS.md      (universal fallback)"
+  echo "  6) All supported tools"
+  echo "  7) Cancel"
   echo ""
-  read -rp "Enter choice [1-6]: " choice
+  read -rp "Enter choice [1-7]: " choice
   case "$choice" in
     1) install_claude ;;
-    2) install_copilot ;;
-    3) install_cursor ;;
-    4) install_agents ;;
-    5) install_all ;;
-    6) echo "Cancelled." ; exit 0 ;;
+    2) install_codex ;;
+    3) install_copilot ;;
+    4) install_cursor ;;
+    5) install_agents ;;
+    6) install_all ;;
+    7) echo "Cancelled." ; exit 0 ;;
     *) echo "Invalid choice." >&2 ; exit 1 ;;
   esac
 }
@@ -133,11 +170,12 @@ TOOL="${1:-}"
 if [ -n "$TOOL" ]; then
   case "$TOOL" in
     claude)  install_claude ;;
+    codex)   install_codex ;;
     copilot) install_copilot ;;
     cursor)  install_cursor ;;
     agents)  install_agents ;;
     all)     install_all ;;
-    *)       echo "Unknown tool: $TOOL. Use: claude, copilot, cursor, agents, or all." >&2 ; exit 1 ;;
+    *)       echo "Unknown tool: $TOOL. Use: claude, codex, copilot, cursor, agents, or all." >&2 ; exit 1 ;;
   esac
 elif [ -t 0 ]; then
   show_menu
@@ -147,4 +185,4 @@ else
 fi
 
 echo ""
-echo "Your AI assistant will auto-discover the config when you open this project."
+echo "Install complete."

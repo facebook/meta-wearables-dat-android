@@ -1,0 +1,28 @@
+{
+  "name": "mwdat-android",
+  "version": "0.7.0",
+  "description": "Git-native DAT SDK guidance for android development, covering setup, camera streaming, display access, MockDeviceKit, session lifecycle, permissions, debugging, and sample app patterns.",
+  "homepage": "https://github.com/facebook/meta-wearables-dat-android",
+  "repository": "https://github.com/facebook/meta-wearables-dat-android",
+  "keywords": [
+    "wearables",
+    "dat",
+    "android",
+    "sdk",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Meta Wearables DAT Android",
+    "shortDescription": "Git-native DAT SDK guidance for android development, covering setup, camera streaming, display access, MockDeviceKit, session lifecycle, permissions, debugging, and sample app patterns.",
+    "longDescription": "Git-hosted Codex plugin for Meta Wearables DAT Android. It packages the same public DAT SDK guidance shipped to Claude, including setup, camera streaming, display access, MockDeviceKit, session lifecycle, permissions, debugging, and sample app guidance.",
+    "developerName": "Meta Wearables",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/facebook/meta-wearables-dat-android",
+    "brandColor": "#1B74E4"
+  }
+}

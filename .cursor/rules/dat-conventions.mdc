@@ -3,78 +3,105 @@ description: DAT SDK conventions for android development
 alwaysApply: true
 ---
 
-
 # DAT SDK Conventions (Android)
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Build app | `./gradlew assembleDebug` |
+| Run tests | `./gradlew test` |
+| Install app | `./gradlew installDebug` |
+| Lint app | `./gradlew lint` |
 
 ## Architecture
 
-The SDK is organized into three modules:
-- **mwdat-core**: Device discovery, registration, permissions, device selectors
-- **mwdat-camera**: StreamSession, VideoFrame, photo capture
+The SDK is organized into four public modules:
+
+- **mwdat-core**: Registration, permissions, devices, and session creation
+- **mwdat-camera**: Stream capability, video frames, and photo capture
+- **mwdat-display**: Display capability, display UI components, icons, images, buttons, and video
 - **mwdat-mockdevice**: MockDeviceKit for testing without hardware
 
-## Kotlin Patterns
-
-- Use `suspend` functions for async operations — no callbacks
-- Use `StateFlow` / `Flow` for observing state changes
-- Use `DatResult<T, E>` for error handling — not exceptions
-- Prefer immutable collections
-- Use `sealed interface` for state hierarchies
-
-## Error Handling
-
-The SDK uses `DatResult<T, E>` for type-safe error handling:
+### Initialization and session setup
 
 ```kotlin
-val result = Wearables.someOperation()
-result.fold(
-    onSuccess = { value -> /* handle success */ },
-    onFailure = { error -> /* handle error */ }
-)
+Wearables.initialize(context)
 
-// Or partial handling:
-result.onSuccess { value -> /* handle success */ }
-result.onFailure { error -> /* handle error */ }
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
+val stream = session.addStream(StreamConfiguration()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+stream.start().getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
 ```
 
-Do **not** use `getOrThrow()` — always handle both paths.
+## Kotlin patterns
 
-## Naming Conventions
+- Use `DatResult<T, E>` for typed success and failure handling
+- Observe state with `StateFlow` and `Flow`
+- Create a `Session` first, then attach capabilities such as `Stream` or `Display`
+- Keep frame handling off the main thread when doing heavier processing
 
-| Suffix | Purpose | Example |
-|--------|---------|---------|
-| `*Manager` | Long-lived resource management | `RegistrationManager` |
-| `*Session` | Short-lived flow component | `StreamSession` |
-| `*Result` | DatResult type aliases | `RegistrationResult` |
-| `*Error` | Error sealed interfaces | `WearablesError` |
-
-Methods: `get*`, `set*`, `check*`, `request*`, `observe*`
-
-## Imports
+## Error handling
 
 ```kotlin
-import com.meta.wearable.dat.core.Wearables          // Entry point
-import com.meta.wearable.dat.camera.StreamSession     // Camera streaming
-import com.meta.wearable.dat.camera.types.*            // VideoFrame, PhotoData, etc.
+Wearables.checkPermissionStatus(Permission.CAMERA)
+    .onSuccess { status -> /* handle status */ }
+    .onFailure { error, _ -> /* handle error */ }
 ```
 
-For testing:
+Avoid `getOrThrow()` in user-facing samples. Surface typed errors from `DatResult` instead.
+
+## Naming conventions
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| `Session` | Device connection lifecycle | `Wearables.createSession(...)` |
+| `Stream` | Camera capability on a session | `session.addStream(...)` |
+| `Display` | Display capability on a session | `session.addDisplay(...)` |
+| `*Selector` | Device targeting | `AutoDeviceSelector` |
+| `*Error` | Typed failure surface | `SessionError`, `StreamError` |
+
+## Key types
+
+- `Wearables` — SDK entry point
+- `Session` — lifecycle for an interaction with a linked device
+- `Stream` — camera capability attached to a session
+- `Display` — display capability attached to a session
+- `StreamConfiguration` — video quality and frame rate configuration
+- `MockDeviceKit` — simulated device environment for testing
+
+## Live docs search
+
+If your editor supports remote MCP servers, connect `https://mcp.facebook.com/wearables_dat` and use `search_dat_docs` for current DAT setup, session lifecycle, camera streaming, MockDeviceKit, permissions, and exact API symbols.
+
+Use `llms.txt` when your tool only supports static reference context.
+
+## Testing with MockDeviceKit
+
 ```kotlin
-import com.meta.wearable.dat.mockdevice.MockDeviceKit  // MockDeviceKit
+val mockDeviceKit = MockDeviceKit.getInstance(context)
+mockDeviceKit.enable()
+val device = mockDeviceKit.pairRaybanMeta()
 ```
 
-## Key Types
+Use MockDeviceKit to drive registration, device availability, streaming media, and permission scenarios without physical hardware.
 
-- `Wearables` — SDK entry point. Call `Wearables.initialize(context)` at startup
-- `StreamSession` — Camera streaming session
-- `VideoFrame` — Individual video frame with bitmap data
-- `AutoDeviceSelector` — Auto-selects the best available device
-- `SpecificDeviceSelector` — Selects a specific device by identifier
-- `StreamConfiguration` — Configure video quality, frame rate
-- `MockDeviceKit` — Factory for creating simulated devices in tests
+## Common pitfalls
+
+- Do not call SDK APIs before `Wearables.initialize(context)`
+- Do not assume a session implies streaming or display access; capabilities are attached separately
+- Do not ignore `DatResult` failures from `createSession`, `start`, `addStream`, `addDisplay`, or `capturePhoto`
+- Do not reuse terminally stopped sessions
 
 ## Links
 
-- [Android API Reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.6)
-- [Developer Documentation](https://wearables.developer.meta.com/docs/develop/)
-- [GitHub Repository](https://github.com/facebook/meta-wearables-dat-android)
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
+- [Developer documentation](https://wearables.developer.meta.com/docs/develop/)
+- [GitHub repository](https://github.com/facebook/meta-wearables-dat-android)

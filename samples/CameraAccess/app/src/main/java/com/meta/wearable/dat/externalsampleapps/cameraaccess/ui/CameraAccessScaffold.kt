@@ -17,7 +17,7 @@
 // - NonStreamScreen: When registered (uiState.isRegistered = true) but not streaming Shows device
 //   selection, permission checking, and pre-streaming setup
 // - StreamScreen: When actively streaming (uiState.isStreaming = true) Shows live video from
-//   StreamSession.videoStream and photo capture UI
+//   Stream.videoStream and photo capture UI
 //
 // The scaffold also provides a debug menu (in DEBUG builds) that gives access to
 // MockDeviceKitScreen for testing DAT functionality without physical devices.

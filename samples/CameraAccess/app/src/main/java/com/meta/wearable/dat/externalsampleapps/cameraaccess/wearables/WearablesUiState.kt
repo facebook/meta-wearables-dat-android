@@ -18,20 +18,22 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
 data class WearablesUiState(
-    val registrationState: RegistrationState = RegistrationState.Unavailable(),
+    val registrationState: RegistrationState = RegistrationState.UNAVAILABLE,
     val devices: ImmutableList<DeviceIdentifier> = persistentListOf(),
     val recentError: String? = null,
     val isStreaming: Boolean = false,
     val isDebugMenuVisible: Boolean = false,
     val isGettingStartedSheetVisible: Boolean = false,
+    val isFirmwareUpdateRequired: Boolean = false,
+    val isDatAppUpdateRequired: Boolean = false,
     val hasActiveDevice: Boolean = false,
     val canRegister: Boolean = false,
 ) {
   val isRegistered: Boolean =
-      registrationState is RegistrationState.Registered ||
-          registrationState is RegistrationState.Unregistering
+      registrationState == RegistrationState.REGISTERED ||
+          registrationState == RegistrationState.UNREGISTERING
 
-  val isRegistering: Boolean = registrationState is RegistrationState.Registering
+  val isRegistering: Boolean = registrationState == RegistrationState.REGISTERING
 
   val canStartRegistration: Boolean = canRegister && !isRegistering
 }

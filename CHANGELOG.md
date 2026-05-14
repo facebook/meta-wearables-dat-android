@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-05-14
+
+### Added
+
+- [Feature] **Display capability** — `mwdat-display` brings visual experiences to Meta Ray-Ban Display glasses, with content rendering (FlexBox, Text, Button, Image, Icon) and MP4 video playback.
+  - `Display` interface conforming to `Capability`, accessed via `DeviceSession.addDisplay(config)` / `DeviceSession.removeDisplay()`.
+  - `DisplayConfiguration` for configuring a display session, plus typed `DisplayState` and `DisplayError` enums for observing display lifecycle and error handling.
+  - `Display.sendContent { ... }` for building UI declaratively. Each call replaces the entire display; content is presented one view at a time with vertical scrolling only.
+  - `FlexBoxScope` view builders: `flexBox`, `text`, `icon`, `image`, `button` with `Direction`, `Alignment`, `ButtonStyle`, `CornerRadius`, `IconName`, `IconStyle`, `ImageSize`, `TextColor`, `TextStyle`, `FlexBoxBackground` styling primitives.
+  - `VideoPlayer` with `VideoSource.Url`, `VideoCodec.MP4`, plus typed `VideoPlayerState` and `VideoPlayerError` for observation.
+- [Feature] **Device Access Toolkit App Model (DAM)** — a new architecture model for the SDK. Apps opt in by declaring `<meta-data android:name="com.meta.wearable.mwdat.DAM_ENABLED" android:value="true" />` in `AndroidManifest.xml`. DAM is required for the new Display capability; both the App Model flow and the older flow continue to be supported for camera functionality on Meta AI glasses.
+  - `Wearables.openDATGlassesAppUpdate(activity)`: opens the Meta AI DAT app update destination for the configured app.
+- [API] `Wearables.openFirmwareUpdate(activity)`: opens the Meta AI firmware update screen for the connected device.
+- [API] `Wearables.getDeviceState(deviceIdentifier)`: returns a `StateFlow<DeviceState>` exposing live device state, including current `ThermalLevel`.
+- [API] `Wearables.registrationErrorStream`: returns a `Flow<RegistrationError>` for observing registration errors out-of-band from `RegistrationState`.
+- [API] `Wearables.isDevMode`: returns whether the SDK is configured for developer mode.
+- [API] `DeviceSession.errors`: `SharedFlow<DeviceSessionError>` for observing session-scoped errors.
+- [API] `DeviceState` data class with a `thermalLevel` property exposing per-device thermal status.
+- [API] `ThermalLevel` enum exposing per-device thermal state.
+- [API] `NavigationError` enum: typed error for the new `Wearables.openFirmwareUpdate` / `openDATGlassesAppUpdate` APIs.
+- [API] `DeviceSessionError` (replaces `SessionError`) adds typed cases for thermal, battery, and peak-power conditions: `BATTERY_CRITICAL`, `PEAK_POWER_SHUTDOWN`, `THERMAL_CRITICAL`, `THERMAL_EMERGENCY`. Also adds `DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED` for surfacing required app updates.
+- [API] `StreamError` cases: `BATTERY_LOW`, `CRITICAL_STREAM_ERROR`, `PEAK_POWER_LIMIT`, `THERMAL_EMERGENCY`, `THERMAL_HOT`, `TIMEOUT` for typed handling of streaming failures.
+- [API] `DeviceType.isDisplayCapable` and `Device.isDisplayCapable()`: helpers to check whether a device or device type supports a display capability.
+- [API] `SpecificDeviceSelector.activeDevice()`: returns the currently active `DeviceIdentifier` for the selector.
+- [API] `Stream.errorStream` and `Stream.start()`: `Stream` now exposes a typed error stream and an explicit `start()` method.
+- [API] `VideoFrame.isCodecConfig`: indicates whether a frame contains codec configuration data instead of payload video frames. Constructor signature changed to include the new flag.
+- [Feature] **Captouch simulation:** `MockDeviceKit` now allows simulating `tap` and `tapAndHold` captouch gestures via the new `MockCaptouchKit` interface, accessible from `MockDisplaylessGlasses.services.captouch`.
+
+### Changed
+
+- [API] **Overhauled session management to make device sessions explicit.** The previously-implicit CoreUX session is now surfaced as `DeviceSession`, which serves as the entry point to interact with a glasses device — capabilities like `Stream` and `Display` are attached to a session via `DeviceSession.addStream(...)` / `addDisplay(...)`, and session state and errors are observed directly on the `DeviceSession` instance rather than via global `Wearables` APIs. This consolidates several renames:
+  - `Session` class is now `DeviceSession`. Existing extension functions `addStream(...)` / `removeStream(...)` now take a `DeviceSession` receiver.
+  - `SessionError` is now `DeviceSessionError` (with additional cases — see *Added*).
+  - `SessionState` is now `DeviceSessionState`. State values are `IDLE`, `STARTING`, `STARTED`, `PAUSED`, `STOPPING`, `STOPPED` for finer lifecycle tracking.
+  - `StreamSession` is now `Stream` (interface, conforming to `Capability`).
+  - `StreamSessionState` is now `StreamState`.
+  - The `Wearables.startStreamSession(...)` factory is removed; create a `DeviceSession` via `Wearables.createSession(...)`, then call `DeviceSession.addStream(config)` (and `removeStream()` to detach).
+  - `Wearables.getDeviceSessionState(deviceIdentifier)` removed; observe state directly on the `DeviceSession` instance via `DeviceSession.state`.
+- [API] `RegistrationState` reshaped from a sealed class hierarchy (`Available`, `Registered`, `Registering`, `Unavailable`, `Unregistering`) to a plain enum (`AVAILABLE`, `REGISTERED`, `REGISTERING`, `UNAVAILABLE`, `UNREGISTERING`). The previous registration-error payload has been moved to `Wearables.registrationErrorStream`.
+
+### Fixed
+
+- `Wearables.checkPermission()` (via `PermissionsSession`): fixed double-resume crash that could occur when a permission check is completed twice.
+- `PermissionsSession`: fixed stale state after Bluetooth reconnection so subsequent permission checks reflect current device state.
+- `Stream` (photo capture): added a timeout to photo capture to prevent permanent locking when the capture never completes.
+- `MockDeviceKit`: `don()` and `fold()` now maintain consistent device state across cycles.
+- `VideoFrame`: fixed buffer lifecycle when surfacing compressed video codec config frames.
+- `ACDCRegistrationService`: fixed a leaked `ServiceConnection` during registration.
+
 ## [0.6.0] - 2026-04-15
 
 ### Added

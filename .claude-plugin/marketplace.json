@@ -1,0 +1,17 @@
+{
+  "name": "mwdat-android-marketplace",
+  "owner": {
+    "name": "Meta Wearables"
+  },
+  "plugins": [
+    {
+      "name": "mwdat-android",
+      "version": "0.7.0",
+      "description": "Git-native DAT SDK guidance for android development, covering setup, camera streaming, display access, MockDeviceKit, session lifecycle, permissions, debugging, and sample app patterns.",
+      "author": {
+        "name": "Meta Wearables"
+      },
+      "source": "./plugins/mwdat-android"
+    }
+  ]
+}

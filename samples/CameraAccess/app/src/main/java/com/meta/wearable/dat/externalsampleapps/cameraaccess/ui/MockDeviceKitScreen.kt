@@ -13,7 +13,9 @@
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
+import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,6 +35,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +49,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -183,11 +188,14 @@ private fun MockDeviceCard(
 
   // Camera permission handling for phone camera source
   var pendingCameraFacing by remember { mutableStateOf<CameraFacing?>(null) }
+  var showCameraPermissionAlert by remember { mutableStateOf(false) }
   val cameraPermissionLauncher =
       rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) {
           granted ->
         if (granted) {
           pendingCameraFacing?.let { facing -> viewModel.setCameraFeed(deviceInfo, facing) }
+        } else {
+          showCameraPermissionAlert = true
         }
         pendingCameraFacing = null
       }
@@ -346,6 +354,34 @@ private fun MockDeviceCard(
         }
       }
     }
+  }
+
+  if (showCameraPermissionAlert) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = { showCameraPermissionAlert = false },
+        title = { Text(stringResource(R.string.camera_permission_alert_title)) },
+        text = { Text(stringResource(R.string.camera_permission_alert_message)) },
+        confirmButton = {
+          TextButton(
+              onClick = {
+                showCameraPermissionAlert = false
+                val intent =
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                      data = Uri.fromParts("package", context.packageName, null)
+                    }
+                context.startActivity(intent)
+              },
+          ) {
+            Text(stringResource(R.string.camera_permission_open_settings))
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = { showCameraPermissionAlert = false }) {
+            Text(stringResource(R.string.camera_permission_cancel))
+          }
+        },
+    )
   }
 }
 

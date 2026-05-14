@@ -1,0 +1,122 @@
+---
+name: camera-streaming
+description: Session and Stream capability setup, video frames, photo capture, resolution and frame rate configuration
+---
+
+# Camera Streaming (Android)
+
+Use a `Session` and attached `Stream` to receive frames and capture photos.
+
+## Key concepts
+
+- **Session**: Device connection lifecycle created through `Wearables.createSession(...)`
+- **Stream**: Camera capability attached to a session with `session.addStream(...)`
+- **StreamConfiguration**: Resolution and frame rate configuration for the stream
+- **PhotoData**: Still image captured from glasses while streaming
+
+## Create a session and attach a stream
+
+```kotlin
+import com.meta.wearable.dat.camera.Stream
+import com.meta.wearable.dat.camera.addStream
+import com.meta.wearable.dat.camera.types.StreamConfiguration
+import com.meta.wearable.dat.camera.types.VideoQuality
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
+
+val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+session.start()
+
+val stream: Stream = session.addStream(
+    StreamConfiguration(
+        videoQuality = VideoQuality.MEDIUM,
+        frameRate = 24,
+    ),
+).getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+
+stream.start().getOrElse { error ->
+    throw IllegalStateException(error.description)
+}
+```
+
+### Resolution options
+
+| Quality | Size |
+|---------|------|
+| `VideoQuality.HIGH` | 720 x 1280 |
+| `VideoQuality.MEDIUM` | 504 x 896 |
+| `VideoQuality.LOW` | 360 x 640 |
+
+### Frame rate options
+
+Valid values: `2`, `7`, `15`, `24`, `30` FPS.
+
+Lower resolution and frame rate usually produce better visual quality per frame over Bluetooth.
+
+## Observe stream state
+
+`StreamState` transitions: `STOPPED` -> `STARTING` -> `STARTED` -> `STREAMING` -> `STOPPING` -> `STOPPED` -> `CLOSED`
+
+```kotlin
+lifecycleScope.launch {
+    stream.state.collect { state ->
+        when (state) {
+            StreamState.STREAMING -> {
+                // Frames are flowing
+            }
+            StreamState.STOPPED -> {
+                // Streaming ended
+            }
+            StreamState.CLOSED -> {
+                // Stream fully closed
+            }
+            else -> Unit
+        }
+    }
+}
+```
+
+## Receive frames
+
+```kotlin
+lifecycleScope.launch {
+    stream.videoStream.collect { frame ->
+        updatePreview(frame)
+    }
+}
+```
+
+## Capture a photo
+
+```kotlin
+lifecycleScope.launch {
+    stream.capturePhoto()
+        .onSuccess { photoData ->
+            val imageBytes = photoData.data
+            savePhoto(imageBytes)
+        }
+        .onFailure { error, _ ->
+            showCaptureError(error.description)
+        }
+}
+```
+
+## Clean up
+
+Stop the stream when you no longer need camera data, then stop the parent session if the device interaction is finished.
+
+```kotlin
+stream.stop()
+session.stop()
+```
+
+If you want to remove the capability entirely before re-adding it, call `session.removeStream()`.
+
+## Links
+
+- [Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/0.7)
+- [Integration guide](https://wearables.developer.meta.com/docs/build-integration-android)
