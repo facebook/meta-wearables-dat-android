@@ -117,37 +117,10 @@ Set up the Meta Wearables Device Access Toolkit in an Android app.
 - Android 10+ test device with the Meta AI app installed
 - Supported Meta glasses or MockDeviceKit for local testing
 - Developer Mode enabled in the Meta AI app for development builds
-- GitHub personal access token with `read:packages` scope
 
-## Step 1: Add the Maven repository
+The SDK is published to Maven Central under the `com.meta.wearable` group, so the `mavenCentral()` repository already declared in `settings.gradle.kts` is all that is needed. No access token is required.
 
-In `settings.gradle.kts`:
-
-```kotlin
-val localProperties =
-    Properties().apply {
-        val localPropertiesPath = rootDir.toPath() / "local.properties"
-        if (localPropertiesPath.exists()) {
-            load(localPropertiesPath.inputStream())
-        }
-    }
-
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven {
-            url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
-            credentials {
-                username = ""
-                password = System.getenv("GITHUB_TOKEN") ?: localProperties.getProperty("github_token")
-            }
-        }
-    }
-}
-```
-
-## Step 2: Declare dependencies
+## Step 1: Declare dependencies
 
 In `libs.versions.toml`:
 
@@ -180,7 +153,7 @@ dependencies {
 }
 ```
 
-## Step 3: Configure `AndroidManifest.xml`
+## Step 2: Configure `AndroidManifest.xml`
 
 ```xml
 <manifest ...>
@@ -210,7 +183,7 @@ dependencies {
 
 `APPLICATION_ID` and `CLIENT_TOKEN` are used for app attestation and can be found in the Wearables Developer Center. In Developer Mode, attestation is not used, so the manifest placeholders can both be `0`. For production, replace both placeholders with the credentials for your Wearables Developer Center app. Replace `myexampleapp` with your app's URL scheme.
 
-## Step 4: Initialize the SDK
+## Step 3: Initialize the SDK
 
 ```kotlin
 import com.meta.wearable.dat.core.Wearables
@@ -224,7 +197,7 @@ class MyApplication : Application() {
 }
 ```
 
-## Step 5: Register and create a session
+## Step 4: Register and create a session
 
 ```kotlin
 import com.meta.wearable.dat.core.Wearables
@@ -259,7 +232,7 @@ lifecycleScope.launch {
 }
 ```
 
-## Step 6: Add camera streaming
+## Step 5: Add camera streaming
 
 ```kotlin
 import com.meta.wearable.dat.camera.addCamera

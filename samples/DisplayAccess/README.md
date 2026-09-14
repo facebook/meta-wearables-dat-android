@@ -29,7 +29,6 @@ A sample app demonstrating how to connect to display-capable Meta AI glasses, st
 Example `local.properties` values:
 
 ```properties
-github_token=YOUR_GITHUB_TOKEN
 mwdat_application_id=YOUR_APPLICATION_ID
 mwdat_client_token=YOUR_CLIENT_TOKEN
 ```
@@ -40,7 +39,6 @@ mwdat_client_token=YOUR_CLIENT_TOKEN
 
 1. Clone this repository
 1. Open the project in Android Studio
-1. Add your personal access token (classic) to the `local.properties` file (see [SDK for Android setup](https://wearables.developer.meta.com/docs/develop/dat/build-integration-android#step-2-add-the-sdk-to-gradle))
 1. Click **File** > **Sync Project with Gradle Files**
 1. Click **Run** > **Run...** > **app**
 
