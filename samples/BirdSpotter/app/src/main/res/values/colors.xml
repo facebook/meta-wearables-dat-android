@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BirdSpotterColors.light.paper — the system-splash ground, needed as a resource
+         because the splash window is drawn before any composition exists. ui/theme/Color.kt
+         is the source of truth; values-night holds the dark twin. -->
+    <color name="splash_background">#FFE9ECE6</color>
+</resources>

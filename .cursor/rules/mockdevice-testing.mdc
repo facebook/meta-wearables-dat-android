@@ -94,6 +94,12 @@ camera.setCapturedImage(imageUri)
 ffmpeg -hwaccel videotoolbox -i input.mp4 -c:v hevc_videotoolbox -c:a aac_at -tag:v hvc1 -vf "scale=540:960" output.mov
 ```
 
+### Phone camera as the feed
+
+`setCameraFeed(CameraFacing)` sources frames from the handset camera, so the app needs `android.permission.CAMERA` in the manifest and at runtime. That is not the DAT `Permission.CAMERA` covered by `MockDeviceKitConfig(initialPermissionsGranted = true)` — no real-glasses path needs the handset grant, so an existing integration will never have requested it.
+
+Grant it before calling `setCameraFeed`; in instrumentation tests, `pm grant <your.package> android.permission.CAMERA`. Without it the mock rejects the stream start and the failure names the missing permission. `setCameraFeed(Uri)` has no such requirement.
+
 ## Writing instrumentation tests
 
 Create a reusable test base class:

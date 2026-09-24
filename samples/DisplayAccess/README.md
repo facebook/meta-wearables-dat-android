@@ -1,15 +1,15 @@
 # Display Access App
 
-A sample app demonstrating how to connect to display-capable Meta AI glasses, start a session for a selected device, attach the display capability, and render guided content on the glasses.
+A sample app demonstrating how to connect to display-capable Meta AI glasses, automatically select a device, attach the display capability, and render guided content on the glasses.
 
 ## Features
 
 - Register and connect to Meta wearable devices
-- Select a specific display-capable device from the device list
-- Automatically move to the samples list when a device session starts
-- Browse the sample entry screen even before the display capability is ready
-- Keep "Try it" disabled until the display capability is ready
+- Automatically select a connected display-capable device when a sample starts
+- Browse and start a sample before creating a device session
 - Send a guided car maintenance experience to the glasses
+- Preview display content on the phone with MockDeviceKit's bundled React renderer
+- Preview the same mock display in Chrome with browser click events routed back to the app
 - Open firmware and DAT glasses app update flows when required
 
 ## Prerequisites
@@ -18,12 +18,13 @@ A sample app demonstrating how to connect to display-capable Meta AI glasses, st
 - JDK 17 or newer
 - Android SDK 36 or newer
 - Meta Wearables Device Access Toolkit (included as a dependency)
-- Display-capable Meta AI glasses for end-to-end testing
+- Display-capable Meta AI glasses, or the built-in phone preview for local testing
+- Chrome with the DAT display preview extension installed for browser preview
 
 ## Setup
 
 1. Open the project in Android Studio or use the Gradle wrapper.
-2. Add your app credentials to `local.properties` or export them in your environment.
+2. Add your credentials to `local.properties`.
 3. Build and run the sample.
 
 Example `local.properties` values:
@@ -52,19 +53,18 @@ mwdat_client_token=YOUR_CLIENT_TOKEN
 
 1. Launch the app on your Android device.
 1. Complete app registration when prompted.
-1. Tap a connected display-capable device in the list.
-1. The app opens the samples list automatically after the session starts.
-1. "Try it" stays disabled while the display capability is preparing.
-1. Once the display is ready, tap "Try it" to send the tutorial flow to the glasses.
+1. Open the Samples tab and tap "Try it." The app automatically selects a connected display-capable device, starts a session, and sends the tutorial when the display is ready.
+1. For local testing, open "Developer preview" on the sample screen and choose Chrome or In app.
+1. For Chrome preview, start the preview server, run the displayed `adb forward` command, open the displayed URL in Chrome, and enable the Meta Ray-Ban Display Simulator extension in Chrome.
 1. If a firmware update is required, tap "Update firmware" on the connection screen.
 1. If session start reports that the app on the glasses is outdated, tap "Update app on glasses" on the connection screen.
 
 ## Architecture
 
 - `app/src/main/java/.../MainActivity.kt`: App entry point and runtime permission handling
-- `app/src/main/java/.../wearables/WearablesViewModel.kt`: Registration and device observation state
-- `app/src/main/java/.../display/DisplayViewModel.kt`: Session lifecycle, capability attachment, and display content
-- `app/src/main/java/.../ui/AppScaffold.kt`: Navigation between settings and samples, including automatic handoff after session start
+- `app/src/main/java/.../wearables/WearablesViewModel.kt`: Registration, device observation, and developer preview state
+- `app/src/main/java/.../display/DisplayViewModel.kt`: Automatic device selection, session lifecycle, capability attachment, and display content
+- `app/src/main/java/.../ui/AppScaffold.kt`: Navigation between settings and samples, including developer preview coordination
 
 ## Permissions
 

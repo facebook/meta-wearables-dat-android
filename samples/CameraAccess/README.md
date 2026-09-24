@@ -8,7 +8,7 @@ A sample Android application demonstrating integration with Meta Wearables Devic
 - Explicit camera lifecycle: start/end a device session and start/stop the live preview
 - Stream the camera feed from the device
 - Capture photos
-- Record video, with optional sound-in-video
+- Record video, with optional sound-in-video captured from the glasses' microphone
 - Keep recording while the app is backgrounded (foreground service)
 - Preview and share captured photos and recorded videos
 - Open the firmware update flow when required
@@ -20,6 +20,19 @@ A sample Android application demonstrating integration with Meta Wearables Devic
 - Android SDK 36 or newer
 - Meta Wearables Device Access Toolkit (included as a dependency)
 - A Meta AI glasses device for testing (optional for development)
+
+## Setup
+
+1. Open the project in Android Studio or use the Gradle wrapper.
+2. Add your credentials to `local.properties`.
+3. Build and run the sample.
+
+Example `local.properties` values:
+
+```properties
+mwdat_application_id=YOUR_APPLICATION_ID
+mwdat_client_token=YOUR_CLIENT_TOKEN
+```
 
 ## Building the app
 
@@ -38,7 +51,7 @@ A sample Android application demonstrating integration with Meta Wearables Devic
 1. Tap "Start Session" to connect to your glasses, then "Preview" to begin the live camera feed.
 1. Use the on-screen controls to:
    - Capture photos
-   - Record video, toggling the microphone for sound-in-video
+   - Record video, toggling the glasses' microphone for sound-in-video
    - Preview and share captured photos and recorded videos
    - Stop the preview, end the session, or disconnect from the device
 1. If a firmware update is required, tap "Update firmware".

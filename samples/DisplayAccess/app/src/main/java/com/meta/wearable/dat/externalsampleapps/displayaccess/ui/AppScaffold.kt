@@ -27,12 +27,14 @@ import androidx.compose.material.icons.outlined.RemoveRedEye
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,11 +48,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.display.types.DisplayState
 import com.meta.wearable.dat.externalsampleapps.displayaccess.R
 import com.meta.wearable.dat.externalsampleapps.displayaccess.SampleApp
 import com.meta.wearable.dat.externalsampleapps.displayaccess.display.DisplayViewModel
+import com.meta.wearable.dat.externalsampleapps.displayaccess.wearables.DeveloperPreviewMode
 import com.meta.wearable.dat.externalsampleapps.displayaccess.wearables.WearablesViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
 
 object Routes {
   const val CONNECT = "connect"
@@ -71,8 +81,24 @@ fun AppScaffold(
   val wearablesState by wearablesViewModel.uiState.collectAsStateWithLifecycle()
   val displayViewModel: DisplayViewModel = viewModel()
   val displayState by displayViewModel.uiState.collectAsStateWithLifecycle()
+  val mockGlasses by wearablesViewModel.mockDisplayGlasses.collectAsStateWithLifecycle()
+  val chromePreviewInfo by wearablesViewModel.chromePreviewInfo.collectAsStateWithLifecycle()
+  val developerPreviewMode by wearablesViewModel.developerPreviewMode.collectAsStateWithLifecycle()
+  val isDeveloperPreviewChanging by
+      wearablesViewModel.isDeveloperPreviewChanging.collectAsStateWithLifecycle()
+  val developerPreviewErrorMessage by
+      wearablesViewModel.developerPreviewErrorMessage.collectAsStateWithLifecycle()
   val isCapabilityReady = displayState.displayState == DisplayState.STARTED
-  val lastKnownSessionActive = remember { mutableStateOf(displayState.isSessionActive) }
+  val previewDisplayKit =
+      remember(mockGlasses, isCapabilityReady, developerPreviewMode) {
+        mockGlasses
+            ?.takeIf {
+              isCapabilityReady && developerPreviewMode == DeveloperPreviewMode.IN_APP
+            }
+            ?.services
+            ?.display
+      }
+  val snackbarHostState = remember { SnackbarHostState() }
   val activity = LocalActivity.current
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = backStackEntry?.destination?.route ?: Routes.CONNECT
@@ -91,18 +117,35 @@ fun AppScaffold(
     }
   }
 
-  DisposableEffect(displayState.isSessionActive) {
-    val sessionJustStarted = !lastKnownSessionActive.value && displayState.isSessionActive
-    lastKnownSessionActive.value = displayState.isSessionActive
-    if (sessionJustStarted && currentRoute == Routes.CONNECT) {
-      openSamples()
+  LaunchedEffect(wearablesViewModel, displayViewModel) {
+    combine(
+        wearablesViewModel.uiState,
+        displayViewModel.uiState,
+    ) { currentWearablesState, currentDisplayState ->
+      val registrationStopsSession =
+          currentWearablesState.registrationState == RegistrationState.UNAVAILABLE ||
+              currentWearablesState.registrationState == RegistrationState.AVAILABLE
+      registrationStopsSession && currentDisplayState.isSessionActive
     }
-    onDispose {}
+        .distinctUntilChanged()
+        .collect { shouldStopSession ->
+          if (shouldStopSession) displayViewModel.stopSession()
+        }
+  }
+
+  LaunchedEffect(displayViewModel, snackbarHostState) {
+    displayViewModel.uiState
+        .mapNotNull { it.snackbarMessage }
+        .collectLatest { message ->
+          displayViewModel.clearSnackbarMessage()
+          snackbarHostState.showSnackbar(message)
+        }
   }
 
   Scaffold(
       modifier = modifier,
       containerColor = BackgroundColor,
+      snackbarHost = { SnackbarHost(snackbarHostState) },
       bottomBar = {
         BottomTabBar(
             currentRoute = currentRoute,
@@ -120,27 +163,62 @@ fun AppScaffold(
       composable(Routes.CONNECT) {
         ConnectScreen(
             uiState = wearablesState,
-            selectedDisplayDeviceId = displayState.selectedDeviceId,
-            isDisplayReady = isCapabilityReady,
-            isPreparingDisplay = displayState.isPreparingDisplay,
             isDatAppUpdateRequired = displayState.isDatAppUpdateRequired,
+            mockDisplayDeviceId = mockGlasses?.deviceIdentifier,
             onRegister = { activity?.let { wearablesViewModel.startRegistration(it) } },
             onUnregister = {
-              displayViewModel.stopSession()
               activity?.let { wearablesViewModel.startUnregistration(it) }
             },
             onOpenFirmwareUpdate = { activity?.let { wearablesViewModel.openFirmwareUpdate(it) } },
             onOpenDatAppUpdate = {
               activity?.let { wearablesViewModel.openDATGlassesAppUpdate(it) }
             },
-            onSelectDevice = { deviceId -> displayViewModel.prepareDisplayConnection(deviceId) },
         )
       }
 
       composable(Routes.SAMPLES_LIST) {
+        val isDeveloperPreviewBusy =
+            isDeveloperPreviewChanging ||
+                displayState.isStartingSession ||
+                displayState.isStoppingSession ||
+                displayState.isPreparingDisplay ||
+                displayState.isSending
+        val previewDeviceIdentifier = mockGlasses?.deviceIdentifier
+        val coroutineScope = rememberCoroutineScope()
+
+        fun updateDeveloperPreview(mode: DeveloperPreviewMode?) {
+          coroutineScope.launch {
+            try {
+              if (!displayViewModel.stopSession()) return@launch
+              val deviceId = wearablesViewModel.setDeveloperPreviewMode(mode)
+              if (mode != null && deviceId != null) {
+                displayViewModel.sendSampleToPreview(SampleApp.CAR_MAINTENANCE, deviceId)
+              }
+            } catch (error: CancellationException) {
+              throw error
+            } catch (error: Exception) {
+              wearablesViewModel.reportDeveloperPreviewFailure(error)
+            }
+          }
+        }
+
         SamplesListScreen(
-            isTryItEnabled = displayState.isSessionActive && isCapabilityReady,
-            onSampleSelected = displayViewModel::sendSampleToDisplay,
+            isTryItEnabled = !isDeveloperPreviewBusy,
+            developerPreviewMode = developerPreviewMode,
+            isDeveloperPreviewBusy = isDeveloperPreviewBusy,
+            hasLoadedDeveloperPreview =
+                developerPreviewMode != null &&
+                    previewDeviceIdentifier != null &&
+                    displayState.hasSentContent &&
+                    displayState.selectedDeviceId == previewDeviceIdentifier,
+            chromePreviewCommand = chromePreviewInfo?.adbCommand,
+            chromePreviewUrl = chromePreviewInfo?.url,
+            developerPreviewErrorMessage =
+                developerPreviewErrorMessage ?: displayState.errorMessage,
+            onSampleSelected = { sample -> displayViewModel.sendSampleToDisplay(sample) },
+            onStartDeveloperPreview = ::updateDeveloperPreview,
+            onStopDeveloperPreview = { updateDeveloperPreview(null) },
+            previewDisplayKit = previewDisplayKit,
         )
       }
 

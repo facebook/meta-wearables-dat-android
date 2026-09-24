@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (c) Meta Platforms, Inc. and affiliates.
+    All rights reserved.
+
+    This source code is licensed under the license found in the
+    LICENSE file in the root directory of this source tree.
+
+    What the app's captures FileProvider is willing to hand out — the one cache directory a
+    test photograph is written to, and nothing else. Named exactly rather than granted as
+    `cache-path .` with an empty path, for the same reason the diagnostics scope is: the cache
+    holds whatever else the app and its libraries have put there, and sharing a photograph
+    must not become a door onto all of it.
+-->
+<paths>
+    <cache-path
+        name="captures"
+        path="glasses-captures/" />
+</paths>

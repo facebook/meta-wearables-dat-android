@@ -7,7 +7,7 @@ description: Session state, stream state, pause and resume behavior, and device 
 
 Manage session and stream state in DAT SDK integrations.
 
-Create a `Session` with `Wearables.createSession(...)`, start it, then attach capabilities such as camera streaming. Session lifecycle and stream lifecycle are related but distinct.
+Create a `DeviceSession` with `Wearables.createSession(...)`, start it, then attach capabilities such as camera streaming once the session is `STARTED`. Session lifecycle and capability lifecycle are related but distinct.
 
 ## Session states
 
@@ -18,40 +18,52 @@ Create a `Session` with `Wearables.createSession(...)`, start it, then attach ca
 | `STARTED` | Session active and ready for capabilities | Add or use capabilities |
 | `PAUSED` | Session temporarily suspended | Keep state, wait for resume or stop |
 | `STOPPING` | Session is shutting down | Stop user work and wait |
-| `STOPPED` | Session ended | Release resources and create a new session if needed |
+| `STOPPED` | Terminal; session ended | Release resources and create a new session if needed |
+
+`STOPPED` is terminal: a stopped session cannot be restarted, so call `Wearables.createSession(...)` again for the next connection.
 
 ## Observe session state
 
-```kotlin
-val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
-    throw IllegalStateException(error.description)
-}
-session.start()
+`start()` and `stop()` are both sync fire-and-forget and return `Unit`. Subscribe to `state` and `errors` before calling `start()` so no transition is missed, and treat `session.errors` as the failure channel for `start()`.
 
-lifecycleScope.launch {
-    session.state.collect { state ->
-        when (state) {
-            DeviceSessionState.STARTED -> onStarted()
-            DeviceSessionState.PAUSED -> onPaused()
-            DeviceSessionState.STOPPED -> onStopped()
-            else -> Unit
+```kotlin
+Wearables.createSession(AutoDeviceSelector()).fold(
+    onSuccess = { session ->
+        lifecycleScope.launch {
+            session.state.collect { state ->
+                when (state) {
+                    DeviceSessionState.STARTED -> onStarted(session)
+                    DeviceSessionState.PAUSED -> onPaused()
+                    DeviceSessionState.STOPPED -> onStopped()
+                    else -> Unit
+                }
+            }
         }
-    }
-}
+        lifecycleScope.launch {
+            session.errors.collect { error -> showError(error.description) }
+        }
+        session.start()
+    },
+    onFailure = { error, _ -> showError(error.description) },
+)
 ```
+
+Add capabilities from `onStarted(session)`. Calling `session.addCamera(...)` while the session is still `IDLE` fails with `DeviceSessionError.SESSION_IDLE`, and calling it after `STOPPED` fails with `DeviceSessionError.SESSION_ALREADY_STOPPED`.
 
 ## Stream state
 
-Camera streaming has its own state flow after you attach a stream:
+Camera streaming has its own state flow after you add a camera:
 
 ```text
-STOPPED -> STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED -> CLOSED
+STOPPED -> STARTING -> STARTED -> STREAMING -> STOPPING -> STOPPED
 ```
+
+`CLOSED` is the terminal stream state, and `PAUSED` is reported when the device pauses streaming (for example a single cap-touch tap) and can resume on its own.
 
 ```kotlin
 lifecycleScope.launch {
     camera.stream.state.collect { state ->
-        // React to camera capability state changes
+        // React to stream state changes
     }
 }
 ```
@@ -91,7 +103,7 @@ Use `Wearables.devices` and device metadata to decide when it is sensible to cre
 - [ ] Observe stream state separately from session state
 - [ ] Release resources only after stop or close
 - [ ] Recreate sessions after terminal stops instead of reusing dead ones
-- [ ] Surface typed `SessionError` and `StreamError` failures
+- [ ] Surface typed `DeviceSessionError` and `StreamError` failures
 
 ## Links
 

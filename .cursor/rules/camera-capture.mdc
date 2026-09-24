@@ -1,0 +1,8 @@
+---
+description: Capture standalone high-quality photos from connected glasses on Android
+globs: **/*Photo*, **/*Capture*, **/*Camera*
+---
+
+# Camera Capture (Android)
+
+Use `camera.photo` for standalone high-quality capture, not `stream.capturePhoto()`. Stop Stream first; accessing Photo starts it lazily. Wait for `PhotoState.STARTED`, then capture and observe data, progress, and errors. Stop Photo before Camera. Requires camera permission and is experimental.

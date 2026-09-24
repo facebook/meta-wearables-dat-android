@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -13,6 +14,14 @@ plugins {
   alias(libs.plugins.jetbrains.kotlin.android)
   alias(libs.plugins.compose.compiler)
 }
+
+val localProperties =
+    Properties().apply {
+      val file = rootDir.resolve("local.properties")
+      if (file.exists()) {
+        file.inputStream().use { load(it) }
+      }
+    }
 
 android {
   namespace = "com.meta.wearable.dat.externalsampleapps.cameraaccess"
@@ -32,15 +41,16 @@ android {
     // Meta Wearables Device Access Toolkit Setup
     // Without Developer Mode, these values need to be set with credentials from the app registered
     // in Wearables Developer Center
-    manifestPlaceholders["mwdat_application_id"] = ""
-    manifestPlaceholders["mwdat_client_token"] = ""
+    manifestPlaceholders["mwdat_application_id"] =
+        localProperties.getProperty("mwdat_application_id", "")
+    manifestPlaceholders["mwdat_client_token"] =
+        localProperties.getProperty("mwdat_client_token", "")
   }
 
   buildTypes {
     release {
       isMinifyEnabled = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("debug")
     }
   }
   compileOptions {
@@ -48,14 +58,6 @@ android {
     targetCompatibility = JavaVersion.VERSION_17
   }
   packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
-  signingConfigs {
-    getByName("debug") {
-      storeFile = file("sample.keystore")
-      storePassword = "sample"
-      keyAlias = "sample"
-      keyPassword = "sample"
-    }
-  }
 }
 
 kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }

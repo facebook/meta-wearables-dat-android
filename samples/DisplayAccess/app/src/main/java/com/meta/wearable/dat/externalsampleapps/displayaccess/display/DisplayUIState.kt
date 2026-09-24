@@ -30,6 +30,9 @@ data class DisplayUIState(
     val isStartingSession: Boolean = false,
     val isStoppingSession: Boolean = false,
     val isDatAppUpdateRequired: Boolean = false,
+    val isSending: Boolean = false,
+    val hasSentContent: Boolean = false,
+    val errorMessage: String? = null,
     val snackbarMessage: String? = null,
 
     // Display capability

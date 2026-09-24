@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BirdSpotterColors.dark.paper — the system-splash ground after dark; see
+         values/colors.xml for why this exists as a resource at all. -->
+    <color name="splash_background">#FF0D1315</color>
+</resources>

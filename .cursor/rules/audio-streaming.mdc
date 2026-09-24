@@ -1,0 +1,8 @@
+---
+description: Configure and receive PCM audio with Camera Stream on Android
+globs: **/*Audio*, **/*Stream*, **/*Camera*
+---
+
+# Audio Streaming (Android)
+
+Audio is an experimental Camera Stream extension. Require camera and microphone permission, set a non-null PCM `audioCodec`, collect `audioStream` before starting Stream, and use `presentationTimeUs`. Cancel collectors before stopping Camera. MockDeviceKit does not promise deterministic PCM delivery.

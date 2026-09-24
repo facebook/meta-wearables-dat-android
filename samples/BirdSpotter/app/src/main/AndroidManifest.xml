@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+ Permissions the Identify tab asks for. The iOS twins are the NS*UsageDescription keys in
+ birdspotter-Info.plist; the request plumbing on each side is the divergence. Location
+ takes fine or coarse — a sighting stamp does not need pinpoint accuracy (see
+ SystemLocationProvider).
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- The sighting map (Google Maps SDK) fetches its tiles over the network. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        The glasses. DAT sessions ride Bluetooth Classic, and CONNECT is the runtime half of
+        that on 31+ — declaring it here is half the job, and MainActivity raises the prompt for
+        it before the SDK boots. The legacy BLUETOOTH permission the integration guide also
+        lists covers only API 30 and below, which minSdk 31 makes unreachable, so it is
+        deliberately absent.
+        The iOS twins are NSBluetoothAlwaysUsageDescription and the two UIBackgroundModes in
+        birdspotter-Info.plist.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!--
+ A real-time session with the phone locked in a pocket. Holding the microphone outside
+ the foreground needs a foreground service typed microphone (mandatory since 14), and the
+ DAT link rides along as connectedDevice; the notification the service must carry is the
+ pocketed session's only surface, which is what POST_NOTIFICATIONS is for. See
+ RealtimeSessionService.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".BirdSpotterApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BirdSpotter">
+
+        <!--
+            Google Maps SDK for Android key for the sighting map. The value is injected from
+            local.properties (gitignored) through the MAPS_API_KEY manifest placeholder
+            It is empty when no key is configured, which leaves the map blank but
+            still lets the app build and run. The iOS twin needs no such key: MapKit is keyless.
+        -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
+        <!--
+            DAT attestation identifiers, injected by the build from local.properties
+            so the client token — a credential — stays out of a public repo. A clone without
+            those values gets "0", the documented Developer Mode placeholder, and loses nothing:
+            BirdSpotter runs in Developer Mode only, and there attestation is skipped and
+            registration always allowed. The iOS twin is the MWDAT dictionary in
+            birdspotter-Info.plist.
+
+            A "Failed to read metadata from manifest" warning at launch is expected with the
+            placeholder values and is harmless: both entries are present and read back as
+            strings from this app's own metadata, and Developer Mode works.
+        -->
+        <meta-data
+            android:name="com.meta.wearable.mwdat.APPLICATION_ID"
+            android:value="${mwdat_application_id}" />
+        <meta-data
+            android:name="com.meta.wearable.mwdat.CLIENT_TOKEN"
+            android:value="${mwdat_client_token}" />
+
+        <!--
+            Analytics and SDK crash capture both default to ON, so leaving these entries out
+            would read as consent. BirdSpotter has no analytics pipeline to feed and no crash
+            triage to run — anything sent off-device is collected by nobody — so the opt-out is
+            written down rather than assumed.
+        -->
+        <meta-data
+            android:name="com.meta.wearable.mwdat.ANALYTICS_OPT_OUT"
+            android:value="true" />
+        <meta-data
+            android:name="com.meta.wearable.mwdat.CRASH_REPORTING_OPT_OUT"
+            android:value="true" />
+
+        <!--
+            Portrait for the whole life of the app — there is one activity, so this is the whole
+            app. Every screen is laid out one column wide, and the viewfinder rotates its frames
+            by a constant quarter turn on both platforms (see PhoneCameraPreviewSource) rather
+            than tracking the display. The iOS twin is the
+            INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait build
+            setting in birdspotter.xcodeproj, which is paired with TARGETED_DEVICE_FAMILY = 1.
+        -->
+        <!--
+            Sharing a diagnostic log out of the app. A file under filesDir cannot be attached
+            to an Intent directly — the receiving app has no read access to this app's private
+            storage — so it goes out as a content:// URI with a one-shot grant. The scope is
+            the diagnostics directory alone; see res/xml/diagnostics_paths.xml. The iOS twin is
+            `ShareLink`, which needs no declaration at all.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.diagnostics"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/diagnostics_paths" />
+        </provider>
+
+        <!--
+            Sharing a test photograph out of the app. Its own authority rather than a second
+            path on the diagnostics provider above: that one's scope is a directory of text
+            under filesDir, this one's is a directory of images under the cache, and one
+            provider granting both would be a single one-shot grant reaching further than
+            either share needs. See res/xml/capture_paths.xml.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.captures"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/capture_paths" />
+        </provider>
+
+        <!--
+            Holds a real-time session open once the phone is locked — see the permissions
+            above. Started by MainActivity when a run begins; stops itself when the run ends.
+        -->
+        <service
+            android:name=".data.session.RealtimeSessionService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|connectedDevice" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BirdSpotter"
+            android:windowSoftInputMode="adjustResize">
+
+            <!--
+                targetSdk 36 is what makes this line necessary: from Android 16, screenOrientation
+                is ignored outright on any display at least sw600dp — a tablet or an unfolded
+                foldable would rotate anyway. The property opts back into compatibility mode so
+                the lock above holds everywhere. It is a temporary escape hatch: the framework
+                drops it at API 37, and the app is phone-shaped enough (iOS ships iPhone-only)
+                that going adaptive is a design conversation, not a manifest edit.
+            -->
+            <property
+                android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+                android:value="true" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                The Meta AI callback. Registration hands off to the Meta AI app and comes back by
+                opening birdspotter:// — the scheme registered in the Wearables Developer Center —
+                which must land in this same task rather than stack a second copy of the app over
+                a live session (hence launchMode="singleTask" above; the activity is the whole
+                app, so the mode costs nothing). The iOS twin is CFBundleURLTypes in
+                birdspotter-Info.plist.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="birdspotter" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

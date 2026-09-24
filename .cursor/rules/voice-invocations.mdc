@@ -1,0 +1,8 @@
+---
+description: Handle Hey Meta app launch invocations on Android
+globs: **/*VoiceInvocation*, **/*LaunchApp*, **/*ResponseHandle*
+---
+
+# Voice Invocations (Android)
+
+Voice Invocations is a Wearables-level stream and needs no DeviceSession or runtime camera/microphone permission. Validate intents in `onCreate` and `onNewIntent`, retain one app-scoped auto-starting stream, acknowledge every `LaunchApp` exactly once, and call `close()` during cleanup. The feature is experimental.

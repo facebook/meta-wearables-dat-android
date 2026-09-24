@@ -1,0 +1,10 @@
+<!-- Phosphor eyeglasses. Generated from assets/glyphs/glasses.svg — see that folder's README. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 18.75 3.75 a 0.75 0.75 0 0 0 0 1.5 1.5 1.5 0 0 1 1.5 1.5 v 5.445 A 4.125 4.125 0 0 0 13.6575 14.25 H 10.3425 A 4.125 4.125 0 0 0 3.75 12.195 V 6.75 A 1.5 1.5 0 0 1 5.25 5.25 a 0.75 0.75 0 0 0 0 -1.5 A 3 3 0 0 0 2.25 6.75 v 8.625 a 4.125 4.125 0 0 0 8.2322 0.375 h 3.0356 A 4.125 4.125 0 0 0 21.75 15.375 V 6.75 A 3 3 0 0 0 18.75 3.75 Z M 6.375 18 a 2.625 2.625 0 1 1 2.625 -2.625 A 2.625 2.625 0 0 1 6.375 18 Z m 11.25 0 a 2.625 2.625 0 1 1 2.625 -2.625 A 2.625 2.625 0 0 1 17.625 18 Z" />
+</vector>

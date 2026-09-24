@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.BirdSpotter" parent="android:Theme.Material.Light.NoActionBar">
+        <!--
+            The Android-12 system splash: bare paper with the icon suppressed, so the
+            badge's only appearance is features/splash/SplashScreen.kt — drawn at badge
+            size, and animated. The default here would flash the launcher badge at icon
+            size first: two badges, two sizes, a second apart. iOS says the same with
+            UILaunchScreen in birdspotter-Info.plist.
+        -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+    </style>
+</resources>

@@ -3,7 +3,7 @@ agp = "8.11.1"
 kotlin = "2.2.21"
 activityCompose = "1.13.0"
 composeBom = "2026.05.01"
-mwdat = "0.9.0"
+mwdat = "1.0.0"
 lifecycle = "2.10.0"
 navigationCompose = "2.9.8"
 
@@ -17,6 +17,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
 mwdat-display = { group = "com.meta.wearable", name = "mwdat-display", version.ref = "mwdat" }
+mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "mwdat" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -12,9 +12,14 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.types.DatResult
 import com.meta.wearable.dat.core.types.Device
 import com.meta.wearable.dat.core.types.DeviceIdentifier
 import com.meta.wearable.dat.core.types.RegistrationState
+import com.meta.wearable.dat.mockdevice.MockDeviceKit
+import com.meta.wearable.dat.mockdevice.api.GlassesModel
+import com.meta.wearable.dat.mockdevice.api.MockDeviceKitError
+import com.meta.wearable.dat.mockdevice.api.MockGlasses
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +31,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAG = "DisplaySampleWearablesRepo"
+
+data class ChromePreviewInfo(
+    val adbCommand: String,
+    val url: String,
+)
 
 class WearablesRepository(
     private val applicationContext: Context,
@@ -42,6 +52,13 @@ class WearablesRepository(
 
   private val _devicesMetadata = MutableStateFlow<Map<DeviceIdentifier, Device>>(emptyMap())
   val devicesMetadata: StateFlow<Map<DeviceIdentifier, Device>> = _devicesMetadata.asStateFlow()
+
+  private val mockDeviceKit = MockDeviceKit.getInstance(applicationContext)
+  private val _mockDisplayGlasses = MutableStateFlow<MockGlasses?>(null)
+  val mockDisplayGlasses: StateFlow<MockGlasses?> = _mockDisplayGlasses.asStateFlow()
+  private val _chromePreviewInfo = MutableStateFlow<ChromePreviewInfo?>(null)
+  val chromePreviewInfo: StateFlow<ChromePreviewInfo?> = _chromePreviewInfo.asStateFlow()
+
   private val monitoringExceptionHandler = CoroutineExceptionHandler { _, throwable ->
     Log.e(TAG, "Wearables monitoring failed", throwable)
   }
@@ -100,6 +117,55 @@ class WearablesRepository(
       return
     }
     Wearables.startUnregistration(activity)
+  }
+
+  fun enablePhonePreview(): DatResult<MockGlasses, MockDeviceKitError> {
+    _mockDisplayGlasses.value?.let {
+      return DatResult.success(it)
+    }
+
+    mockDeviceKit.enable()
+    return mockDeviceKit
+        .pairGlasses(GlassesModel.META_RAYBAN_DISPLAY)
+        .map { glasses ->
+          glasses.powerOn()
+          glasses.don()
+          _mockDisplayGlasses.value = glasses
+          glasses
+        }
+        .onFailure { error, _ ->
+          Log.e(TAG, "Failed to pair phone preview display: $error")
+          disablePhonePreview()
+        }
+  }
+
+  fun startChromePreview(): DatResult<ChromePreviewInfo, MockDeviceKitError> {
+    _chromePreviewInfo.value?.let {
+      return DatResult.success(it)
+    }
+
+    return mockDeviceKit.startTestServer(9000).map { port ->
+      ChromePreviewInfo(
+          adbCommand = "adb forward tcp:$port tcp:$port",
+          url = "http://127.0.0.1:$port/",
+      )
+          .also { _chromePreviewInfo.value = it }
+    }
+  }
+
+  fun stopChromePreview() {
+    mockDeviceKit.stopTestServer()
+    _chromePreviewInfo.value = null
+  }
+
+  fun disablePhonePreview() {
+    mockDeviceKit.stopTestServer()
+    _chromePreviewInfo.value = null
+    val glasses = _mockDisplayGlasses.value
+    _mockDisplayGlasses.value = null
+    glasses?.doff()
+    glasses?.powerOff()
+    mockDeviceKit.disable()
   }
 
   companion object {

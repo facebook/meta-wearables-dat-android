@@ -972,6 +972,7 @@ The following components are licensed under MIT License reproduced below:
 
 checkerframework qual 3.42.0 , Copyright 2004-present by the Checker Framework developers
 dataclassgenerate , Copyright (c) Meta Platforms, Inc. and affiliates.
+fflate 0.6.10 , Copyright (c) 2020 Arjun Barrett
 fmt 9.1.0 , Copyright (c) 2012 - present, Victor Zverovich
 infer-annotations 0.17.3 , Copyright (c) Facebook, Inc. and its affiliates.
 MIT License Copyright (c) <year> <copyright holders>

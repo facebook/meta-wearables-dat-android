@@ -59,7 +59,7 @@ and use this skill for observed app/device behavior.
   `session.state`, and session errors
 - Stream: `session.addCamera(...)`, `camera.stream.start()`, `camera.stream.state`, frame
   counters, and stream errors
-- DAM/DWA-visible transport: `sdk.usesDam` and DAM/DWA error values
+- DAM/DWA-visible transport: DAM/DWA error values
 
 ## Diagnosis patterns
 

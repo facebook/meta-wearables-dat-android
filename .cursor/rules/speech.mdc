@@ -1,0 +1,8 @@
+---
+description: Recognize speech and handle partial and final transcriptions on Android
+globs: **/*Speech*, **/*Transcript*, **/*Caption*
+---
+
+# Speech (Android)
+
+Request DAT microphone permission only after a user action. Attach Speech after `DeviceSessionState.STARTED`, launch state/locale/error/transcription collectors before `speech.start()`, handle partial and final results, and cancel collectors before removal. Host `RECORD_AUDIO` is only for live-phone MockDevice recognition. Speech is experimental.

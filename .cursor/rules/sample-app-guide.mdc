@@ -13,7 +13,7 @@ Pair this with the [CameraAccess sample](https://github.com/facebook/meta-wearab
 
 1. Create an Android Studio app project.
 2. Add the DAT Maven repository and dependencies.
-3. Configure `AndroidManifest.xml` for registration callbacks and `APPLICATION_ID`.
+3. Configure `AndroidManifest.xml` for registration callbacks plus `APPLICATION_ID` and `CLIENT_TOKEN`.
 4. Initialize `Wearables` in your `Application`.
 
 ## Suggested app structure
@@ -49,27 +49,56 @@ class MainActivity : ComponentActivity() {
 }
 ```
 
+`DeviceSession.start()` is fire-and-forget. Attach the camera from the session-state collector once the session reports `DeviceSessionState.STARTED`; adding a capability to an `IDLE` session fails with `DeviceSessionError.SESSION_IDLE`.
+
 ```kotlin
 class SessionViewModel : ViewModel() {
-    private var session: Session? = null
+    private var session: DeviceSession? = null
     private var camera: Camera? = null
 
     fun startCameraSession() {
-        val createdSession = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
-            throw IllegalStateException(error.description)
-        }
-        createdSession.start()
-        session = createdSession
+        Wearables.createSession(AutoDeviceSelector()).fold(
+            onSuccess = { createdSession ->
+                session = createdSession
 
-        camera = createdSession.addCamera(
+                viewModelScope.launch {
+                    createdSession.errors.collect { error -> showError(error.description) }
+                }
+                viewModelScope.launch {
+                    createdSession.state.collect { state ->
+                        when (state) {
+                            DeviceSessionState.STARTED -> attachCamera(createdSession)
+                            DeviceSessionState.STOPPED -> clearSession(createdSession)
+                            else -> Unit
+                        }
+                    }
+                }
+
+                createdSession.start()
+            },
+            onFailure = { error, _ -> showError(error.description) },
+        )
+    }
+
+    private fun attachCamera(activeSession: DeviceSession) {
+        if (camera != null) return
+        activeSession.addCamera(
             StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 24),
-        ).getOrElse { error ->
-            throw IllegalStateException(error.description)
-        }.also { addedCamera ->
-            addedCamera.stream.start().getOrElse { error ->
-                throw IllegalStateException(error.description)
-            }
-        }
+        ).fold(
+            onSuccess = { addedCamera ->
+                camera = addedCamera
+                addedCamera.stream.start().onFailure { error, _ ->
+                    showError(error.description)
+                }
+            },
+            onFailure = { error, _ -> showError(error.description) },
+        )
+    }
+
+    private fun clearSession(stoppedSession: DeviceSession) {
+        if (session !== stoppedSession) return
+        camera = null
+        session = null
     }
 }
 ```
@@ -87,7 +116,10 @@ fun capturePhoto() {
     viewModelScope.launch {
         camera?.stream?.capturePhoto()
             ?.onSuccess { photoData ->
-                savePhoto(photoData.data)
+                when (photoData) {
+                    is PhotoData.Bitmap -> savePhoto(photoData.bitmap)
+                    is PhotoData.HEIC -> saveHeic(photoData.data)
+                }
             }
             ?.onFailure { error, _ ->
                 showCaptureError(error.description)

@@ -1,0 +1,9 @@
+---
+description: Stream motion sensor samples from connected wearables on Android
+globs: **/*Motion*, **/*Sensor*
+---
+
+# Motion (Android)
+
+Attach Motion only after `DeviceSessionState.STARTED`. Launch state, error, and sample collectors before `motion.start()`. Treat sensor values as nullable, handle `PAUSED`, stop and cancel collectors before `session.removeMotion()`, and use MockDevice recordings for deterministic tests. Motion has no runtime permission and is experimental.
+

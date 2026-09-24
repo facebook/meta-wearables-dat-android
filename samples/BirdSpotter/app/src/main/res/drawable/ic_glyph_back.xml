@@ -1,0 +1,10 @@
+<!-- Phosphor caret-left, Bold. Generated from assets/glyphs/back.svg — see that folder's README. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 15.7959 18.7041 a 1.125 1.125 0 0 1 -1.5938 1.5938 l -7.5 -7.5 a 1.125 1.125 0 0 1 0 -1.5938 l 7.5 -7.5 a 1.125 1.125 0 0 1 1.5938 1.5938 L 9.0938 12 Z" />
+</vector>

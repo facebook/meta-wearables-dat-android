@@ -22,7 +22,7 @@ In `libs.versions.toml`:
 
 ```toml
 [versions]
-mwdat = "0.8.0"
+mwdat = "1.0.0"
 
 [libraries]
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
@@ -82,33 +82,52 @@ dependencies {
 ## Step 3: Initialize the SDK
 
 ```kotlin
+import android.util.Log
 import com.meta.wearable.dat.core.Wearables
 
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Wearables.initialize(this)
-            .onFailure { error, _ -> error("Failed to initialize DAT: ${error.description}") }
+            .onFailure { error, _ ->
+                Log.e("DATWearables", "Failed to initialize DAT: ${error.description}")
+            }
     }
 }
 ```
 
 ## Step 4: Register and create a session
 
+Registration must complete before a session can start. Observe `Wearables.registrationState` and wait for `RegistrationState.REGISTERED`.
+
 ```kotlin
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
+import com.meta.wearable.dat.core.session.DeviceSession
+import com.meta.wearable.dat.core.session.DeviceSessionState
 
 fun connect(activity: Activity) {
     Wearables.startRegistration(activity)
 }
 
 fun startSession() {
-    val session = Wearables.createSession(AutoDeviceSelector()).getOrElse { error ->
-        throw IllegalStateException(error.description)
-    }
-
-    session.start()
+    Wearables.createSession(AutoDeviceSelector()).fold(
+        onSuccess = { session ->
+            lifecycleScope.launch {
+                session.errors.collect { error -> showError(error.description) }
+            }
+            lifecycleScope.launch {
+                session.state.collect { state ->
+                    if (state == DeviceSessionState.STARTED) {
+                        addCameraStreaming(session)
+                    }
+                }
+            }
+            // Fire-and-forget: returns Unit and reports failures through session.errors.
+            session.start()
+        },
+        onFailure = { error, _ -> showError(error.description) },
+    )
 }
 ```
 
@@ -130,26 +149,32 @@ lifecycleScope.launch {
 
 ## Step 5: Add camera streaming
 
+Call this only once the session reports `DeviceSessionState.STARTED`; adding a capability earlier fails with `DeviceSessionError.SESSION_IDLE`.
+
 ```kotlin
 import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.types.StreamConfiguration
 import com.meta.wearable.dat.camera.types.VideoQuality
 
-val camera = session.addCamera(
-    StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 24),
-).getOrElse { error ->
-    throw IllegalStateException(error.description)
-}
-
-camera.stream.start().onFailure { error, _ ->
-    throw IllegalStateException(error.description)
+fun addCameraStreaming(session: DeviceSession) {
+    session.addCamera(
+        StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 24),
+    ).fold(
+        onSuccess = { camera ->
+            camera.stream.start().onFailure { error, _ -> showError(error.description) }
+        },
+        onFailure = { error, _ -> showError(error.description) },
+    )
 }
 ```
 
+Camera access also needs the DAT camera permission; see the permissions and registration rule.
+
 ## Next steps
 
-- [Camera Streaming](camera-streaming.md) — Stream capability, video frames, photo capture
-- [MockDevice Testing](mockdevice-testing.md) — Test without hardware
-- [Session Lifecycle](session-lifecycle.md) — Handle session and stream state changes
-- [Permissions](permissions-registration.md) — Registration and permission flows
+- Camera streaming — Stream capability, video frames, photo capture
+- MockDevice testing — Test without hardware
+- Session lifecycle — Handle session and stream state changes
+- Permissions and registration — Registration and permission flows
+- Display access — Render content on Meta Ray-Ban Display glasses
 - [Full Android API reference](https://wearables.developer.meta.com/docs/reference/android/dat/latest)

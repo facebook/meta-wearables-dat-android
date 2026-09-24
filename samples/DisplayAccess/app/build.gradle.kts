@@ -17,15 +17,17 @@ plugins {
 
 val localProperties =
     Properties().apply {
-      val localPropertiesFile = rootProject.file("local.properties")
-      if (localPropertiesFile.exists()) {
-        localPropertiesFile.inputStream().use(::load)
+      val file = rootDir.resolve("local.properties")
+      if (file.exists()) {
+        file.inputStream().use { load(it) }
       }
     }
 
 android {
   namespace = "com.meta.wearable.dat.externalsampleapps.displayaccess"
   compileSdk = 36
+
+  buildFeatures { buildConfig = true }
 
   defaultConfig {
     applicationId = "com.meta.wearable.dat.externalsampleapps.displayaccess"
@@ -34,12 +36,11 @@ android {
     versionCode = 1
     versionName = "1.0"
 
+    // Meta Wearables Device Access Toolkit Setup
     manifestPlaceholders["mwdat_application_id"] =
-        providers.gradleProperty("mwdat_application_id").orNull
-            ?: localProperties.getProperty("mwdat_application_id", "")
+        localProperties.getProperty("mwdat_application_id", "")
     manifestPlaceholders["mwdat_client_token"] =
-        providers.gradleProperty("mwdat_client_token").orNull
-            ?: localProperties.getProperty("mwdat_client_token", "")
+        localProperties.getProperty("mwdat_client_token", "")
   }
 
   buildTypes {
@@ -69,4 +70,5 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.mwdat.core)
   implementation(libs.mwdat.display)
+  implementation(libs.mwdat.mockdevice)
 }

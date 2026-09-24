@@ -17,6 +17,8 @@ import androidx.annotation.GuardedBy
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
+import com.meta.wearable.dat.core.selectors.DeviceSelector
 import com.meta.wearable.dat.core.selectors.SpecificDeviceSelector
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.session.DeviceSessionState
@@ -29,6 +31,7 @@ import com.meta.wearable.dat.display.types.DisplayState
 import com.meta.wearable.dat.display.types.VideoCodec
 import com.meta.wearable.dat.display.types.VideoPlayerState
 import com.meta.wearable.dat.display.types.VideoSource
+import com.meta.wearable.dat.display.views.ActionRole
 import com.meta.wearable.dat.display.views.Alignment
 import com.meta.wearable.dat.display.views.ButtonStyle
 import com.meta.wearable.dat.display.views.ContentScope
@@ -43,6 +46,7 @@ import com.meta.wearable.dat.display.views.TextStyle
 import com.meta.wearable.dat.display.views.VideoPlayer
 import com.meta.wearable.dat.externalsampleapps.displayaccess.R
 import com.meta.wearable.dat.externalsampleapps.displayaccess.SampleApp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @SuppressLint(
     "AutoCloseableUse",
@@ -75,15 +80,15 @@ class DisplayViewModel(
                 listOf(
                     CarMaintenanceTutorialStep(
                         description =
-                            "Park on level ground and let the engine cool before opening the hood."
+                            "Park on level ground and let the engine cool before opening the hood.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Drain the old oil, replace the filter, and tighten the drain plug."
+                            "Drain the old oil, replace the filter, and tighten the drain plug.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Refill with fresh oil, run the engine briefly, and recheck the level."
+                            "Refill with fresh oil, run the engine briefly, and recheck the level.",
                     ),
                 ),
         ),
@@ -96,15 +101,15 @@ class DisplayViewModel(
                 listOf(
                     CarMaintenanceTutorialStep(
                         description =
-                            "Park away from traffic, engage the brake, and place the wheel wedges."
+                            "Park away from traffic, engage the brake, and place the wheel wedges.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Loosen the lug nuts slightly, raise the car, and remove the flat tire."
+                            "Loosen the lug nuts slightly, raise the car, and remove the flat tire.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Mount the spare, tighten in a star pattern, and lower the vehicle."
+                            "Mount the spare, tighten in a star pattern, and lower the vehicle.",
                     ),
                 ),
         ),
@@ -117,15 +122,15 @@ class DisplayViewModel(
                 listOf(
                     CarMaintenanceTutorialStep(
                         description =
-                            "Open the rear access cover and disconnect the bulb connector."
+                            "Open the rear access cover and disconnect the bulb connector.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Release the retaining clip, remove the old bulb, and insert the new one."
+                            "Release the retaining clip, remove the old bulb, and insert the new one.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Reconnect power, close the cover, and verify the beam works properly."
+                            "Reconnect power, close the cover, and verify the beam works properly.",
                     ),
                 ),
         ),
@@ -139,15 +144,15 @@ class DisplayViewModel(
                 listOf(
                     CarMaintenanceTutorialStep(
                         description =
-                            "Check whether the light is steady or flashing, and stop driving if it is flashing."
+                            "Check whether the light is steady or flashing, and stop driving if it is flashing.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Tighten the gas cap fully and look for obvious issues like low fluids or overheating."
+                            "Tighten the gas cap fully and look for obvious issues like low fluids or overheating.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Scan for diagnostic codes or schedule service if the light stays on after restarting."
+                            "Scan for diagnostic codes or schedule service if the light stays on after restarting.",
                     ),
                 ),
         ),
@@ -161,15 +166,15 @@ class DisplayViewModel(
                 listOf(
                     CarMaintenanceTutorialStep(
                         description =
-                            "Open the hood and locate the washer fluid reservoir cap with the windshield symbol."
+                            "Open the hood and locate the washer fluid reservoir cap with the windshield symbol.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Pour washer fluid into the reservoir carefully until it reaches the fill line."
+                            "Pour washer fluid into the reservoir carefully until it reaches the fill line.",
                     ),
                     CarMaintenanceTutorialStep(
                         description =
-                            "Close the cap securely and test the sprayers to confirm proper flow."
+                            "Close the cap securely and test the sprayers to confirm proper flow.",
                     ),
                 ),
         ),
@@ -192,6 +197,9 @@ class DisplayViewModel(
     Log.e(TAG, "Sending display content failed", throwable)
     _uiState.value =
         _uiState.value.copy(
+            isSending = false,
+            hasSentContent = false,
+            errorMessage = throwable.message ?: "Unexpected error",
             snackbarMessage = "Send failed: ${throwable.message ?: "unexpected error"}",
         )
   }
@@ -201,23 +209,29 @@ class DisplayViewModel(
   @GuardedBy("sessionLock") private var sessionStateJob: Job? = null
   @GuardedBy("sessionLock") private var sessionErrorJob: Job? = null
   @GuardedBy("sessionLock") private var displayStateJob: Job? = null
-  @GuardedBy("sessionLock") private var pendingDeviceId: DeviceIdentifier? = null
+  @GuardedBy("sessionLock") private var pendingDisplayAttachment = false
+  @GuardedBy("sessionLock") private var pendingSample: SampleApp? = null
   private var tutorialVideoStateJob: Job? = null
 
   // -- Session lifecycle --
 
-  fun startSession(deviceId: DeviceIdentifier) {
+  private fun startSession(
+      deviceSelector: DeviceSelector,
+      selectedDeviceId: DeviceIdentifier?,
+  ) {
     Log.d(TAG, "Starting DAT session")
     _uiState.value =
         _uiState.value.copy(
-            selectedDeviceId = deviceId,
+            selectedDeviceId = selectedDeviceId,
             connectionState = DwaConnectionState.CONNECTING,
             isStartingSession = true,
             isPreparingDisplay = true,
+            hasSentContent = false,
+            errorMessage = null,
             snackbarMessage = "Starting session...",
         )
 
-    val result = Wearables.createSession(SpecificDeviceSelector(deviceId))
+    val result = Wearables.createSession(deviceSelector)
     result.fold(
         onSuccess = { newSession ->
           synchronized(sessionLock) { session = newSession }
@@ -230,28 +244,33 @@ class DisplayViewModel(
                       Log.i(TAG, "Session started")
                       _uiState.value =
                           _uiState.value.copy(
-                              selectedDeviceId = deviceId,
+                              selectedDeviceId = selectedDeviceId,
                               connectionState = DwaConnectionState.CONNECTED,
                               isSessionActive = true,
                               isStartingSession = false,
                               isDatAppUpdateRequired = false,
                               snackbarMessage = "Session started",
                           )
-                      if (consumePendingDeviceId(deviceId)) {
+                      if (consumePendingDisplayAttachment()) {
                         attachDisplay()
                       }
                     }
                     DeviceSessionState.STOPPED -> {
                       Log.i(TAG, "Session stopped")
-                      synchronized(sessionLock) { pendingDeviceId = null }
+                      clearPendingWork()
                       cleanupDisplay()
                       _uiState.value =
                           _uiState.value.copy(
                               connectionState = DwaConnectionState.DISCONNECTED,
                               isSessionActive = false,
+                              isStartingSession = false,
+                              isStoppingSession = false,
                               isDisplayAttached = false,
                               isPreparingDisplay = false,
+                              isSending = false,
+                              hasSentContent = false,
                               selectedDeviceId = null,
+                              displayState = null,
                               snackbarMessage = "Session stopped",
                           )
                     }
@@ -271,7 +290,7 @@ class DisplayViewModel(
         },
         onFailure = { error, _ ->
           Log.e(TAG, "Failed to create session: ${error.description}")
-          synchronized(sessionLock) { pendingDeviceId = null }
+          clearPendingWork()
           _uiState.value =
               _uiState.value.copy(
                   connectionState = DwaConnectionState.DISCONNECTED,
@@ -279,48 +298,60 @@ class DisplayViewModel(
                   isPreparingDisplay = false,
                   isDatAppUpdateRequired =
                       error == DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED,
+                  isSending = false,
+                  hasSentContent = false,
                   selectedDeviceId = null,
+                  errorMessage = error.description,
                   snackbarMessage = "Failed: ${error.description}",
               )
         },
     )
   }
 
-  fun prepareDisplayConnection(deviceId: DeviceIdentifier) {
-    if (_uiState.value.selectedDeviceId != null && _uiState.value.selectedDeviceId != deviceId) {
-      resetConnectionForNewDevice()
-    }
-
+  private fun prepareDisplayConnection(
+      deviceSelector: DeviceSelector,
+      selectedDeviceId: DeviceIdentifier?,
+  ) {
     when {
-      _uiState.value.isDisplayAttached && _uiState.value.selectedDeviceId == deviceId -> {
+      _uiState.value.isDisplayAttached -> {
+        synchronized(sessionLock) { pendingDisplayAttachment = false }
         _uiState.value =
             _uiState.value.copy(
-                selectedDeviceId = deviceId,
-                isPreparingDisplay = false,
-                snackbarMessage = "Display ready",
+                selectedDeviceId = selectedDeviceId,
+                isPreparingDisplay = _uiState.value.displayState != DisplayState.STARTED,
             )
+        if (_uiState.value.displayState == DisplayState.STARTED) sendPendingSample()
       }
-      _uiState.value.isSessionActive && _uiState.value.selectedDeviceId == deviceId -> {
+      _uiState.value.isSessionActive -> {
+        synchronized(sessionLock) { pendingDisplayAttachment = false }
         _uiState.value =
             _uiState.value.copy(
-                selectedDeviceId = deviceId,
+                selectedDeviceId = selectedDeviceId,
                 isPreparingDisplay = true,
                 snackbarMessage = "Attaching display...",
             )
         attachDisplay()
       }
       else -> {
-        synchronized(sessionLock) { pendingDeviceId = deviceId }
-        startSession(deviceId)
+        synchronized(sessionLock) { pendingDisplayAttachment = true }
+        startSession(deviceSelector, selectedDeviceId)
       }
     }
   }
 
-  fun attachDisplay() {
+  private fun attachDisplay() {
     val currentSession =
         synchronized(sessionLock) { session }
             ?: run {
-              _uiState.value = _uiState.value.copy(snackbarMessage = "No active session")
+              clearPendingWork()
+              _uiState.value =
+                  _uiState.value.copy(
+                      isPreparingDisplay = false,
+                      isSending = false,
+                      hasSentContent = false,
+                      errorMessage = "No active session",
+                      snackbarMessage = "No active session",
+                  )
               return
             }
 
@@ -358,6 +389,7 @@ class DisplayViewModel(
                                 isPreparingDisplay = false,
                                 snackbarMessage = "Display ready",
                             )
+                        sendPendingSample()
                       }
                       if (state == DisplayState.STOPPED && hasStarted) {
                         _uiState.value =
@@ -372,9 +404,13 @@ class DisplayViewModel(
             },
             onFailure = { error, _ ->
               Log.e(TAG, "Failed to attach display: ${error.description}")
+              clearPendingWork()
               _uiState.value =
                   _uiState.value.copy(
                       isPreparingDisplay = false,
+                      isSending = false,
+                      hasSentContent = false,
+                      errorMessage = error.description,
                       snackbarMessage = "Failed: ${error.description}",
                   )
             },
@@ -383,21 +419,46 @@ class DisplayViewModel(
 
   // -- Content --
 
-  fun sendContent(content: ContentScope.() -> Unit) {
+  private fun sendContent(content: ContentScope.() -> Unit) {
+    _uiState.value =
+        _uiState.value.copy(
+            isSending = true,
+            hasSentContent = false,
+            errorMessage = null,
+        )
     viewModelScope.launch(dispatcher + sendContentExceptionHandler) {
       val currentDisplay =
           synchronized(sessionLock) { display }
               ?: run {
-                _uiState.value = _uiState.value.copy(snackbarMessage = "No display attached")
+                _uiState.value =
+                    _uiState.value.copy(
+                        isSending = false,
+                        hasSentContent = false,
+                        errorMessage = "No display attached",
+                        snackbarMessage = "No display attached",
+                    )
                 return@launch
               }
 
       val result = currentDisplay.sendContent(content)
       result.fold(
-          onSuccess = { _uiState.value = _uiState.value.copy(snackbarMessage = "Content sent") },
+          onSuccess = {
+            _uiState.value =
+                _uiState.value.copy(
+                    isSending = false,
+                    hasSentContent = true,
+                    errorMessage = null,
+                    snackbarMessage = "Content sent",
+                )
+          },
           onFailure = { error, _ ->
             _uiState.value =
-                _uiState.value.copy(snackbarMessage = "Send failed: ${error.description}")
+                _uiState.value.copy(
+                    isSending = false,
+                    hasSentContent = false,
+                    errorMessage = error.description,
+                    snackbarMessage = "Send failed: ${error.description}",
+                )
           },
       )
     }
@@ -406,6 +467,54 @@ class DisplayViewModel(
   // -- Sample management --
 
   fun sendSampleToDisplay(sample: SampleApp) {
+    queueOrSendSample(
+        sample = sample,
+        deviceSelector = AutoDeviceSelector(filter = { it.isDisplayCapable() }),
+        selectedDeviceId = null,
+    )
+  }
+
+  fun sendSampleToPreview(
+      sample: SampleApp,
+      deviceId: DeviceIdentifier,
+  ) {
+    queueOrSendSample(
+        sample = sample,
+        deviceSelector = SpecificDeviceSelector(deviceId),
+        selectedDeviceId = deviceId,
+    )
+  }
+
+  private fun queueOrSendSample(
+      sample: SampleApp,
+      deviceSelector: DeviceSelector,
+      selectedDeviceId: DeviceIdentifier?,
+  ) {
+    if (_uiState.value.displayState == DisplayState.STARTED) {
+      sendSampleContent(sample)
+      return
+    }
+
+    synchronized(sessionLock) { pendingSample = sample }
+    _uiState.value =
+        _uiState.value.copy(
+            hasSentContent = false,
+            errorMessage = null,
+        )
+    prepareDisplayConnection(deviceSelector, selectedDeviceId)
+  }
+
+  private fun sendPendingSample() {
+    val sample =
+        synchronized(sessionLock) {
+          val pending = pendingSample
+          pendingSample = null
+          pending
+        }
+    if (sample != null) sendSampleContent(sample)
+  }
+
+  private fun sendSampleContent(sample: SampleApp) {
     Log.i(TAG, "Sending sample to display: ${sample.name}")
     when (sample) {
       SampleApp.CAR_MAINTENANCE -> displayCarMaintenanceScreen()
@@ -418,7 +527,7 @@ class DisplayViewModel(
     _uiState.value = _uiState.value.copy(snackbarMessage = null)
   }
 
-  fun detachDisplay() {
+  private fun detachDisplay() {
     Log.d(TAG, "Detaching display")
     synchronized(sessionLock) { session }?.removeDisplay()
     cleanupDisplay()
@@ -426,51 +535,63 @@ class DisplayViewModel(
         _uiState.value.copy(
             isDisplayAttached = false,
             isPreparingDisplay = false,
+            isSending = false,
+            hasSentContent = false,
             snackbarMessage = "Display detached",
         )
   }
 
-  fun stopSession() {
-    Log.d(TAG, "Stopping session")
-    synchronized(sessionLock) { pendingDeviceId = null }
-    _uiState.value =
-        _uiState.value.copy(
-            isStoppingSession = true,
-            isPreparingDisplay = false,
-            snackbarMessage = "Stopping session...",
-        )
-
-    detachDisplay()
-    clearSessionStateJob()?.cancel()
-    clearSessionErrorJob()?.cancel()
-    clearSession()?.stop()
-
-    _uiState.value =
-        _uiState.value.copy(
-            connectionState = DwaConnectionState.DISCONNECTED,
-            isSessionActive = false,
-            isStoppingSession = false,
-            selectedDeviceId = null,
-            snackbarMessage = "Session stopped",
-        )
+  suspend fun stopSession(): Boolean {
+    return withContext(dispatcher) { stopSessionImmediately() }
   }
 
-  private fun resetConnectionForNewDevice() {
-    synchronized(sessionLock) { pendingDeviceId = null }
-    synchronized(sessionLock) { session }?.removeDisplay()
-    cleanupDisplay()
-    clearSessionStateJob()?.cancel()
-    clearSessionErrorJob()?.cancel()
-    clearSession()?.stop()
-    _uiState.value =
-        _uiState.value.copy(
-            isSessionActive = false,
-            isDisplayAttached = false,
-            connectionState = DwaConnectionState.DISCONNECTED,
-            isStartingSession = false,
-            isPreparingDisplay = false,
-            displayState = null,
-        )
+  private fun stopSessionImmediately(): Boolean {
+    return try {
+      Log.d(TAG, "Stopping session")
+      clearPendingWork()
+      _uiState.value =
+          _uiState.value.copy(
+              isStoppingSession = true,
+              isPreparingDisplay = false,
+              isSending = false,
+              hasSentContent = false,
+              errorMessage = null,
+              snackbarMessage = "Stopping session...",
+          )
+
+      detachDisplay()
+      clearSessionStateJob()?.cancel()
+      clearSessionErrorJob()?.cancel()
+      clearSession()?.stop()
+
+      _uiState.value =
+          _uiState.value.copy(
+              connectionState = DwaConnectionState.DISCONNECTED,
+              isSessionActive = false,
+              isStartingSession = false,
+              isStoppingSession = false,
+              isDisplayAttached = false,
+              selectedDeviceId = null,
+              displayState = null,
+              snackbarMessage = "Session stopped",
+          )
+      true
+    } catch (error: CancellationException) {
+      throw error
+    } catch (error: Exception) {
+      Log.e(TAG, "Stopping session failed", error)
+      val message = getApplication<Application>().getString(R.string.stop_session_error)
+      _uiState.value =
+          _uiState.value.copy(
+              isStoppingSession = false,
+              isPreparingDisplay = false,
+              isSending = false,
+              hasSentContent = false,
+              errorMessage = message,
+              snackbarMessage = message,
+          )
+      false
+    }
   }
 
   private fun cleanupDisplay() {
@@ -482,15 +603,25 @@ class DisplayViewModel(
 
   private fun handleSessionError(error: DeviceSessionError) {
     Log.e(TAG, "Session error: ${error.description}")
+    clearPendingWork()
+    cleanupDisplay()
+    clearSessionStateJob()?.cancel()
+    clearSessionErrorJob()?.cancel()
+    clearSession()?.stop()
     _uiState.value =
         _uiState.value.copy(
             connectionState = DwaConnectionState.DISCONNECTED,
             isSessionActive = false,
             isStartingSession = false,
             isPreparingDisplay = false,
+            isDisplayAttached = false,
             isDatAppUpdateRequired =
                 error == DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED,
+            isSending = false,
+            hasSentContent = false,
             selectedDeviceId = null,
+            displayState = null,
+            errorMessage = error.description,
             snackbarMessage = error.description,
         )
   }
@@ -623,6 +754,7 @@ class DisplayViewModel(
                     displayCarMaintenanceTutorialStep(tutorial, clampedIndex + 1)
                   }
                 },
+                actionRole = ActionRole.PRIMARY,
             )
             button(
                 "Watch video",
@@ -676,18 +808,22 @@ class DisplayViewModel(
 
   override fun onCleared() {
     super.onCleared()
-    stopSession()
+    stopSessionImmediately()
   }
 
-  private fun consumePendingDeviceId(deviceId: DeviceIdentifier): Boolean =
+  private fun consumePendingDisplayAttachment(): Boolean =
       synchronized(sessionLock) {
-        if (pendingDeviceId == deviceId && !_uiState.value.isDisplayAttached) {
-          pendingDeviceId = null
-          true
-        } else {
-          false
-        }
+        val shouldAttach = pendingDisplayAttachment && !_uiState.value.isDisplayAttached
+        pendingDisplayAttachment = false
+        shouldAttach
       }
+
+  private fun clearPendingWork() {
+    synchronized(sessionLock) {
+      pendingDisplayAttachment = false
+      pendingSample = null
+    }
+  }
 
   private fun replaceSessionStateJob(job: Job) {
     synchronized(sessionLock) {

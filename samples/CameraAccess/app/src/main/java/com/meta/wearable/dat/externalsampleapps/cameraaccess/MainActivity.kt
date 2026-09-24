@@ -23,6 +23,7 @@ import android.Manifest.permission.INTERNET
 import android.Manifest.permission.RECORD_AUDIO
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,6 +36,8 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ui.CameraAccessScaffold
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.wearables.WearablesViewModel
+import com.meta.wearable.dat.mockdevice.MockDeviceKit
+import com.meta.wearable.dat.mockdevice.api.MockDeviceKitConfig
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -43,6 +46,15 @@ import kotlinx.coroutines.sync.withLock
 
 class MainActivity : ComponentActivity() {
   companion object {
+    private const val TAG = "CameraAccessMain"
+    // Intent boolean extra that activates the MockDevice test server for out-of-process MCP
+    // control.
+    private const val EXTRA_UI_TESTING = "mwdat_ui_testing"
+    // Fixed loopback port the test server binds so the MCP host can reach it with a
+    // deterministic `adb forward`. Must match _DEFAULT_ANDROID_TEST_SERVER_PORT in the
+    // plugin's mcp/target_resolver.py.
+    private const val MOCK_TEST_SERVER_PORT = 8237
+
     // Required Android permissions for the DAT SDK to function properly
     val PERMISSIONS: Array<String> = arrayOf(BLUETOOTH, BLUETOOTH_CONNECT, INTERNET)
   }
@@ -107,6 +119,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    maybeStartMockDeviceTestServer()
     enableEdgeToEdge()
     setContent {
       CameraAccessScaffold(
@@ -121,5 +134,23 @@ class MainActivity : ComponentActivity() {
     super.onStart()
     // First, ensure the app has necessary Android permissions
     permissionCheckLauncher.launch(PERMISSIONS)
+  }
+
+  // Debug-only: when launched with `--ez mwdat_ui_testing true`, enable MockDeviceKit and start its
+  // local HTTP test server so an out-of-process MCP client can drive the app without real glasses.
+  private fun maybeStartMockDeviceTestServer() {
+    if (!BuildConfig.DEBUG || !intent.getBooleanExtra(EXTRA_UI_TESTING, false)) {
+      return
+    }
+    val mockDeviceKit = MockDeviceKit.getInstance(applicationContext)
+    mockDeviceKit.enable(MockDeviceKitConfig(initiallyRegistered = false))
+    mockDeviceKit
+        .startTestServer(MOCK_TEST_SERVER_PORT)
+        .fold(
+            onSuccess = { Log.i(TAG, "MockDevice test server started") },
+            onFailure = { error, _ ->
+              Log.w(TAG, "Failed to start MockDevice test server: ${error.description}")
+            },
+        )
   }
 }

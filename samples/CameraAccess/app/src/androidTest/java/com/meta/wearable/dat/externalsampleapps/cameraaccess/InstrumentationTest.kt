@@ -19,6 +19,8 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import android.util.Log
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -27,6 +29,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -60,9 +63,6 @@ class InstrumentationTest {
     private const val TAG = "InstrumentationTest"
     private const val DEFAULT_TIMEOUT = 5000L
     private const val STREAM_TIMEOUT = 20000L
-    // Glasses emit an IDR keyframe roughly every few seconds; record past one so the clip
-    // finalizes.
-    private const val RECORD_DURATION_MS = 6000L
   }
 
   @get:Rule val composeTestRule = createAndroidComposeRule<MainActivity>()
@@ -187,6 +187,31 @@ class InstrumentationTest {
   }
 
   @Test
+  fun disconnectWhileStreamingThenReconnectShowsStartSession() {
+    pairActiveDevice(withCameraFeed = true, withCapturedImage = false)
+    startSessionAndStream()
+
+    disconnect()
+
+    val reconnectLabel = targetContext.getString(R.string.register_button_title)
+    composeTestRule.waitUntilExactlyOneExists(
+        hasText(reconnectLabel),
+        timeoutMillis = STREAM_TIMEOUT,
+    )
+    composeTestRule.onNodeWithText(reconnectLabel).performClick()
+
+    // Unregistering does not stop the SDK session, and the camera view model is scoped to the
+    // activity rather than the screen, so re-registering must land on the pre-session screen off
+    // the app's own teardown — not on a camera screen still reporting the old stream.
+    composeTestRule.waitUntilExactlyOneExists(
+        hasTestTag("start_session_button"),
+        timeoutMillis = STREAM_TIMEOUT,
+    )
+    composeTestRule.onNodeWithTag("end_session_button").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("stop_preview_button").assertDoesNotExist()
+  }
+
+  @Test
   fun cameraPermissionDeniedKeepsSessionReady() {
     pairActiveDevice(withCameraFeed = true, withCapturedImage = false)
     // Deny the permission REQUEST too (not just the initial check), so confirming the redirect
@@ -232,7 +257,7 @@ class InstrumentationTest {
     startSessionAndStream()
     recordVideoOnly()
 
-    Thread.sleep(RECORD_DURATION_MS)
+    waitForRecordingCapturing()
     composeTestRule.onNodeWithTag("record_button").performClick()
 
     // Stopping the recording opens the video preview.
@@ -264,7 +289,7 @@ class InstrumentationTest {
     composeTestRule.onNodeWithTag("record_button").performClick()
     waitForRecordingIndicator()
 
-    Thread.sleep(RECORD_DURATION_MS)
+    waitForRecordingCapturing()
     composeTestRule.onNodeWithTag("record_button").performClick()
 
     composeTestRule.waitUntilExactlyOneExists(
@@ -335,7 +360,7 @@ class InstrumentationTest {
     startSessionAndStream()
     recordVideoOnly()
 
-    Thread.sleep(RECORD_DURATION_MS)
+    waitForRecordingCapturing()
     composeTestRule.onNodeWithTag("record_button").performClick()
 
     composeTestRule.waitUntilExactlyOneExists(
@@ -362,6 +387,7 @@ class InstrumentationTest {
 
     // Recording continues after dismissing the photo preview.
     waitForRecordingIndicator()
+    waitForRecordingCapturing()
 
     // Stop the recording → video preview appears; dismiss it.
     composeTestRule.onNodeWithTag("record_button").performClick()
@@ -402,10 +428,11 @@ class InstrumentationTest {
 
     device.fold()
 
-    // Folding closes the hinges → the stream stops (HINGE_CLOSED). The session stays connected, so
-    // the screen returns to session-ready with Start Preview offered again.
+    // Folding takes the glasses off the face and closes the hinge, which ends the session. The
+    // device stays powered and connected, so the screen returns to the pre-session state with Start
+    // Session offered again.
     composeTestRule.waitUntilExactlyOneExists(
-        hasTestTag("start_preview_button"),
+        hasTestTag("start_session_button"),
         timeoutMillis = STREAM_TIMEOUT,
     )
   }
@@ -446,7 +473,7 @@ class InstrumentationTest {
     startSessionAndStream()
     recordVideoOnly()
 
-    Thread.sleep(RECORD_DURATION_MS)
+    waitForRecordingCapturing()
 
     // Pause mid-recording. Recording keeps running, so the record pill must stay enabled as a Stop
     // control — an in-progress recording can be ended without resuming first.
@@ -472,7 +499,7 @@ class InstrumentationTest {
     startSessionAndStream()
     recordVideoOnly()
 
-    Thread.sleep(RECORD_DURATION_MS)
+    waitForRecordingCapturing()
 
     // Pause, then resume mid-recording. PTS is non-monotonic across the resume; without the
     // recorder's monotonic floor clamp MediaMuxer rejects the frame and discards the whole clip.
@@ -489,7 +516,7 @@ class InstrumentationTest {
     // Record a little more after resuming, then stop → the clip must finalize and its preview
     // appear.
     waitForRecordingIndicator()
-    Thread.sleep(RECORD_DURATION_MS)
+    waitForRecordingToAdvance()
     composeTestRule.onNodeWithTag("record_button").performClick()
     composeTestRule.waitUntilExactlyOneExists(
         hasTestTag("close_preview_button"),
@@ -515,6 +542,19 @@ class InstrumentationTest {
     if (withCameraFeed) device.services.camera.setCameraFeed(getFileUri("plant.mp4"))
     if (withCapturedImage) device.services.camera.setCapturedImage(getFileUri("plant.png"))
     return device
+  }
+
+  // Opens the top-bar settings popover and taps Disconnect. The icon and the popover button share
+  // the Disconnect string — the icon carries it as a content description, the button as text — so
+  // the two matchers address them separately.
+  private fun disconnect() {
+    val disconnectLabel = targetContext.getString(R.string.unregister_button_title)
+    composeTestRule.onNodeWithContentDescription(disconnectLabel).performClick()
+    composeTestRule.waitUntilExactlyOneExists(
+        hasText(disconnectLabel),
+        timeoutMillis = DEFAULT_TIMEOUT,
+    )
+    composeTestRule.onNodeWithText(disconnectLabel).performClick()
   }
 
   // Active device → Start Session is shown and enabled.
@@ -587,6 +627,37 @@ class InstrumentationTest {
           .onAllNodesWithTag("recording_indicator", useUnmergedTree = true)
           .fetchSemanticsNodes()
           .isNotEmpty()
+    }
+  }
+
+  // Current value of the recording timer text ("MM:SS"), or null if not recording.
+  private fun recordingElapsedText(): String? =
+      composeTestRule
+          .onAllNodesWithTag("recording_indicator", useUnmergedTree = true)
+          .fetchSemanticsNodes()
+          .firstOrNull()
+          ?.config
+          ?.getOrNull(SemanticsProperties.Text)
+          ?.firstOrNull()
+          ?.text
+
+  // Waits until the recording timer ticks past 00:00. The timer starts only once the muxer writes
+  // the first keyframe, so this proves the clip has begun capturing and will finalize on stop —
+  // unlike a fixed sleep, which gambles on the emulator's frame pacing.
+  private fun waitForRecordingCapturing() {
+    composeTestRule.waitUntil(timeoutMillis = STREAM_TIMEOUT) {
+      recordingElapsedText().let { it != null && it != "00:00" }
+    }
+  }
+
+  // Waits for the recording timer to tick at least once more, proving footage was captured past
+  // this point (used to record on both sides of a pause/resume). Samples a concrete starting value
+  // first so "changed from baseline" can't be satisfied by the timer merely appearing.
+  private fun waitForRecordingToAdvance() {
+    composeTestRule.waitUntil(timeoutMillis = STREAM_TIMEOUT) { recordingElapsedText() != null }
+    val baseline = recordingElapsedText()
+    composeTestRule.waitUntil(timeoutMillis = STREAM_TIMEOUT) {
+      recordingElapsedText().let { it != null && it != baseline }
     }
   }
 

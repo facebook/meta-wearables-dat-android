@@ -1,0 +1,10 @@
+<!-- Phosphor play, Fill. Generated from assets/glyphs/play.svg — see that folder's README. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 22.5 12 a 1.4756 1.4756 0 0 1 -0.7125 1.2666 L 8.28 21.5297 a 1.5 1.5 0 0 1 -1.5187 0.0281 A 1.4869 1.4869 0 0 1 6 20.2622 V 3.7378 a 1.4869 1.4869 0 0 1 0.7612 -1.2956 1.5 1.5 0 0 1 1.5187 0.0281 L 21.7875 10.7334 A 1.4756 1.4756 0 0 1 22.5 12 Z" />
+</vector>

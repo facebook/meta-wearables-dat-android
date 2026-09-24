@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+The public API is covered by semantic versioning guarantees, but features labeled experimental may change between minor releases. They can be built and tested against, though apps using them cannot be published yet.
+
+## [1.0.0] - 2026-09-24
+
+### Added
+
+- Muse Code support. Use your Muse Code tools to build with DAT.
+- [Experimental] **Inputs.** The new `mwdat-inputs` module adds `Inputs`, reporting glasses input to a session as `InputEvent` values, described by `InputSource`, `NavDirection`, `DragAction`, `ButtonType` and `CapturePressType`, with `InputsConfiguration`, `InputsState` and `InputsError`.
+- [Experimental] **Motion.** The new `mwdat-motion` module adds `Motion`, streaming device orientation and movement as `MotionSample` values built from `Vector3` and `Quaternion`, configured with `MotionConfiguration`, `MotionSamplingRate` and `MotionSource`, with `MotionState` and `MotionError`.
+- [Experimental] **Speech.** The new `mwdat-speech` module adds `Speech`, delivering on-device transcription as `TranscriptionResult`, configured with `SpeechConfiguration` and reporting `SpeechState` and `SpeechError`. Requires `Permission.MICROPHONE`.
+- [Experimental] **Voice invocations.** In `mwdat-core`, `VoiceInvocationsStream` delivers `VoiceInvocation` requests to a session, starting with `LaunchApp`, answered through `ResponseHandle`. `SessionState` and `VoiceInvocationError` report lifecycle and failures.
+- [Experimental] **Photo capture.** In `mwdat-camera`, `Camera.photo` captures standalone high-quality photos, delivering `PhotoCaptureData` and reporting `PhotoTransferProgress` while the image transfers. `PhotoConfiguration`, `PhotoResolution` and `PhotoQuality` control capture; `PhotoState` and `PhotoError` report lifecycle and failures.
+- [Experimental] **Camera audio streaming.** In `mwdat-camera`, `StreamConfiguration.audioCodec` and `Stream.audioStream` deliver `AudioFrame` data alongside video, described by `AudioCodec` and `AudioSampleRate`.
+- [API] **Device state on `Device`.** New accessors `batteryLevel` (`Int`), `chargingState` (`ChargingState`), `donState` (`DonState`), `hingeState` (`HingeState`) and `thermalLevel` (`ThermalLevel`), observable via `Wearables.devicesMetadata[id]`.
+- [API] `DeviceSession.deviceInfo: StateFlow<Device>` — the in-session device snapshot with live state updates.
+- [API] `Wearables.handleIntent(intent, onRegistrationRequest)`, `RegistrationRequest` and `RegistrationRequestError` for accepting or cancelling registration requests initiated by Meta AI app.
+- [API] `DeviceSessionError.INSUFFICIENT_SDK_VERSION`: A terminal error indicating that developers must release a newer version of their app built with the current SDK.
+- [API] `DeviceSessionError.DWA_OUT_OF_STU_RANGE`: Adds a nonblocking compatibility warning. Apps can continue normally and may show a rate-limited update suggestion.
+- [API] Display buttons support `ActionRole.PRIMARY`; the first primary action receives focus when content first renders.
+- [Feature] **Mock display preview.** `GlassesModel.META_RAYBAN_DISPLAY` and `MockDisplayKit` render the Display session locally on the phone, with `createPreviewView(context)` for the preview view and `sendClick(identifier)` for click injection. Pairing uses the existing `pairGlasses` API.
+- [Feature] MockDeviceKit gains `MockCameraCaptureKit`, `MockInputKit`, `MockMotionKit`, `MockSpeechKit` and `MockVoiceInvocationKit` so the new capabilities can be exercised without physical glasses, reachable from `MockGlassesServices`. Adds `MockDevice.setBatteryLevel(Int)`, `setChargingState(ChargingState)` and `setThermalLevel(ThermalLevel)` for simulating device state, and `startTestServer(port)` / `stopTestServer()` / `simulateRegistrationOutcome(Boolean)` with `MockDeviceKitError.TestServerUnavailable`.
+
+### Changed
+
+- [API] `Device` gained `thermalLevel`, `batteryLevel`, `chargingState`, `donState` and `hingeState` properties.
+
+### Removed
+
+- [API] `Wearables.getDeviceState(deviceIdentifier): StateFlow<DeviceState>` and the `DeviceState` type — device state now lives on `Device`. Observe `Wearables.devicesMetadata[id]` and read `device.thermalLevel` / `device.batteryLevel` / etc.
+
+### Fixed
+
+- MockDeviceKit stream-start rejections now report why they failed instead of failing without detail. A `setCameraFeed(CameraFacing)` feed blocked by a missing runtime `android.permission.CAMERA` grant now names that permission.
+
 ## [0.9.0] - 2026-08-03
 
 ### Added

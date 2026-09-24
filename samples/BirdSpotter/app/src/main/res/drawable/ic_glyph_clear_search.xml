@@ -1,0 +1,10 @@
+<!-- Phosphor x-circle, Fill. Generated from assets/glyphs/clear_search.svg — see that folder's README. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M 12 2.25 A 9.75 9.75 0 1 0 21.75 12 9.7603 9.7603 0 0 0 12 2.25 Z m 3.5306 12.2194 a 0.75 0.75 0 0 1 -1.0613 1.0613 L 12 13.0603 l -2.4694 2.4703 a 0.75 0.75 0 0 1 -1.0613 -1.0613 L 10.9397 12 8.4694 9.5306 a 0.75 0.75 0 0 1 1.0613 -1.0613 L 12 10.9397 l 2.4694 -2.4703 a 0.75 0.75 0 0 1 1.0613 1.0613 L 13.0603 12 Z" />
+</vector>

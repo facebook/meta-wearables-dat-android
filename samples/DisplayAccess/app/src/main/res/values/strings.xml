@@ -8,7 +8,6 @@
     <string name="samples_tab" description="Samples tab label">Samples</string>
     <string name="settings_tab" description="Settings tab label">Settings</string>
     <string name="no_devices_found" description="No devices text">No devices found</string>
-    <string name="device_preparing" description="Preparing device status">Preparing</string>
 
     <!-- Connect Screen -->
     <string name="connect_title" description="Connect screen title">Connect</string>
@@ -38,5 +37,33 @@
     <string name="sample_car_maintenance" description="Car maintenance sample">Car maintenance guide</string>
     <string name="sample_car_maintenance_desc" description="Car maintenance description">A sample display experience that guides you through a car maintenance task step by step.</string>
     <string name="try_it_button" description="Try it button">Try it</string>
+    <string name="developer_preview_title" description="Title of the developer preview entry and sheet">Developer preview</string>
+    <string name="developer_preview_description" description="Description of developer preview testing">Preview and test the experience without physical glasses.</string>
+    <string name="done_button" description="Button that closes developer preview">Done</string>
+    <string name="chrome_preview_mode" description="Chrome developer preview mode">Chrome</string>
+    <string name="in_app_preview_mode" description="In-app developer preview mode">In app</string>
+    <string name="preview_in_chrome_title" description="Title above Chrome preview instructions">Preview in Chrome</string>
+    <string name="in_app_simulator_title" description="Title above the in-app display simulator">In-app simulator</string>
+    <string name="chrome_preview_step_start_server" description="First Chrome preview instruction">Start the preview server.</string>
+    <string name="chrome_preview_step_adb_forward" description="Chrome preview instruction for forwarding the emulator port">Forward the preview port with ADB.</string>
+    <string name="chrome_preview_step_open_link" description="Chrome preview instruction for opening the preview URL">Open the preview link in Chrome.</string>
+    <string name="chrome_preview_step_enable_extension" description="Chrome preview instruction for enabling the browser extension">Enable the Meta Ray-Ban Display Simulator extension in Chrome.</string>
+    <string name="preview_value_unavailable" description="Placeholder before the Chrome preview server starts">Available after the server starts.</string>
+    <string name="copy_button" description="Button that copies a developer preview value">Copy</string>
+    <string name="copied_button" description="Confirmation that a developer preview value was copied">Copied</string>
+    <string name="developer_preview_clipboard_label" description="Clipboard label for developer preview commands and links">Display preview</string>
+    <string name="in_app_preview_empty_state" description="Instruction shown before in-app preview starts">Tap Preview in app to start.</string>
+    <string name="start_preview_server_button" description="Button that starts Chrome preview">Start preview server</string>
+    <string name="preview_in_app_button" description="Button that starts in-app preview">Preview in app</string>
+    <string name="starting_preview_server" description="Button state while Chrome preview starts">Starting preview server…</string>
+    <string name="starting_in_app_preview" description="Button state while in-app preview starts">Starting in-app preview…</string>
+    <string name="try_again_button" description="Button that retries developer preview setup">Try again</string>
+    <string name="developer_preview_error" description="Unexpected developer preview error">Unable to update the developer preview. Try again.</string>
+    <string name="stop_session_error" description="Unexpected display session cleanup error">Unable to stop the display session. Try again.</string>
+    <string name="chrome_preview_ready" description="Status shown when Chrome preview is ready">Preview ready in Chrome</string>
+    <string name="in_app_preview_ready" description="Status shown when in-app preview is active">Previewing in app</string>
+
+    <!-- Phone preview (without glasses) -->
+    <string name="phone_preview_device_subtitle" description="Subtitle shown on the simulated phone-preview device in the device list">Phone preview</string>
 
 </resources>

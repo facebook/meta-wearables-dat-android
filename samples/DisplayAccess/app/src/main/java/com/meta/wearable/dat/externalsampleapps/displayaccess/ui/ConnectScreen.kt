@@ -65,15 +65,12 @@ private val CompatibilityIssueColor = Color(0xFF8A4B00)
 @Composable
 fun ConnectScreen(
     uiState: WearablesUiState,
-    selectedDisplayDeviceId: DeviceIdentifier?,
-    isDisplayReady: Boolean,
-    isPreparingDisplay: Boolean,
     isDatAppUpdateRequired: Boolean,
+    mockDisplayDeviceId: DeviceIdentifier?,
     onRegister: () -> Unit,
     onUnregister: () -> Unit,
     onOpenFirmwareUpdate: () -> Unit,
     onOpenDatAppUpdate: () -> Unit,
-    onSelectDevice: (DeviceIdentifier) -> Unit,
     modifier: Modifier = Modifier,
 ) {
   Column(
@@ -133,10 +130,7 @@ fun ConnectScreen(
 
     DeviceListCard(
         uiState = uiState,
-        selectedDisplayDeviceId = selectedDisplayDeviceId,
-        isDisplayReady = isDisplayReady,
-        isPreparingDisplay = isPreparingDisplay,
-        onSelectDevice = onSelectDevice,
+        mockDisplayDeviceId = mockDisplayDeviceId,
     )
   }
 }
@@ -322,10 +316,7 @@ private fun RegistrationCard(
 @Composable
 private fun DeviceListCard(
     uiState: WearablesUiState,
-    selectedDisplayDeviceId: DeviceIdentifier?,
-    isDisplayReady: Boolean,
-    isPreparingDisplay: Boolean,
-    onSelectDevice: (DeviceIdentifier) -> Unit,
+    mockDisplayDeviceId: DeviceIdentifier?,
 ) {
   val deviceEntries =
       uiState.devicesMetadata.entries.sortedWith(
@@ -334,7 +325,7 @@ private fun DeviceListCard(
               }
               .thenBy { entry -> entry.value.name.lowercase() },
       )
-  Box(
+  Column(
       modifier =
           Modifier.fillMaxWidth()
               .clip(RoundedCornerShape(30.dp))
@@ -348,22 +339,17 @@ private fun DeviceListCard(
           color = SectionLabel,
       )
     } else {
-      Column {
-        deviceEntries.forEachIndexed { index, entry ->
-          DeviceRow(
-              deviceId = entry.key,
-              device = entry.value,
-              selectedDisplayDeviceId = selectedDisplayDeviceId,
-              isDisplayReady = isDisplayReady,
-              isPreparingDisplay = isPreparingDisplay,
-              onSelectDevice = onSelectDevice,
+      deviceEntries.forEachIndexed { index, entry ->
+        DeviceRow(
+            deviceId = entry.key,
+            device = entry.value,
+            mockDisplayDeviceId = mockDisplayDeviceId,
+        )
+        if (index != deviceEntries.lastIndex) {
+          HorizontalDivider(
+              modifier = Modifier.padding(vertical = 16.dp),
+              color = DividerColor,
           )
-          if (index != deviceEntries.lastIndex) {
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 16.dp),
-                color = DividerColor,
-            )
-          }
         }
       }
     }
@@ -374,37 +360,25 @@ private fun DeviceListCard(
 private fun DeviceRow(
     deviceId: DeviceIdentifier,
     device: Device,
-    selectedDisplayDeviceId: DeviceIdentifier?,
-    isDisplayReady: Boolean,
-    isPreparingDisplay: Boolean,
-    onSelectDevice: (DeviceIdentifier) -> Unit,
+    mockDisplayDeviceId: DeviceIdentifier?,
 ) {
-  val isDisplayDevice = device.isDisplayCapable()
   val isConnected = device.linkState == LinkState.CONNECTED
-  val isSelected = selectedDisplayDeviceId == deviceId
   val isFirmwareUpdateRequired = device.compatibility == DeviceCompatibility.DEVICE_UPDATE_REQUIRED
   val statusText =
       when {
         isFirmwareUpdateRequired -> stringResource(R.string.device_update_required)
-        isSelected && isPreparingDisplay -> stringResource(R.string.device_preparing)
-        isSelected && isDisplayReady -> stringResource(R.string.device_connected)
         isConnected -> stringResource(R.string.device_connected)
         else -> stringResource(R.string.device_disconnected)
       }
   val statusColor =
       when {
         isFirmwareUpdateRequired -> CompatibilityIssueColor
-        isSelected && isPreparingDisplay -> Color(0xFFFFB84D)
-        isSelected && isDisplayReady -> ConnectedColor
         isConnected -> ConnectedColor
         else -> DisconnectedColor
       }
 
   Row(
-      modifier =
-          Modifier.fillMaxWidth()
-              .clickable(enabled = isConnected && isDisplayDevice) { onSelectDevice(deviceId) }
-              .padding(vertical = 2.dp),
+      modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
     Column(modifier = Modifier.weight(1f)) {
@@ -416,7 +390,12 @@ private fun DeviceRow(
           overflow = TextOverflow.Ellipsis,
       )
       Text(
-          text = device.deviceType.description,
+          text =
+              if (deviceId == mockDisplayDeviceId) {
+                stringResource(R.string.phone_preview_device_subtitle)
+              } else {
+                device.deviceType.description
+              },
           style = MaterialTheme.typography.bodyMedium,
           color = SectionLabel,
           modifier = Modifier.padding(top = 4.dp),

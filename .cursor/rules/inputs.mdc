@@ -1,0 +1,10 @@
+---
+description: Receive navigation, button, capture, and drag input events from connected glasses on Android
+globs: **/*Input*
+---
+
+# Inputs (Android)
+
+Attach Inputs only after `DeviceSessionState.STARTED`. Use `session.addInputs(...).fold(...)`; adding starts the capability automatically. Collect state, nullable errors, and events in lifecycle-owned jobs, handle every `InputEvent` subtype, cancel the jobs, then call `session.removeInputs()`.
+
+Inputs requires WDC capability approval but has no runtime `Permission` value. Treat `InputsError.PERMISSION_DENIED` as an approval/configuration problem. The capability is experimental and unavailable to production apps.

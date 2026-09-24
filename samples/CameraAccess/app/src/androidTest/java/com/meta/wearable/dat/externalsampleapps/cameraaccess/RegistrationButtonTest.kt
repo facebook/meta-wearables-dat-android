@@ -24,10 +24,8 @@ import org.junit.runner.RunWith
 /**
  * Verifies that tapping the "Connect my glasses" registration button does not crash the app.
  *
- * The mwdat-core SDK uses FragmentActivity internally for its registration flow
- * (RegistrationManagerImpl.launchIntentForResult), but does not bundle it in its AAR. If
- * androidx.fragment is missing from the app's dependencies, the app crashes at runtime with
- * NoClassDefFoundError when the user taps the register button.
+ * Registration requires the app to declare the AndroidX Fragment dependency. This test guards
+ * against a runtime crash when the user taps the registration button without that dependency.
  */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
