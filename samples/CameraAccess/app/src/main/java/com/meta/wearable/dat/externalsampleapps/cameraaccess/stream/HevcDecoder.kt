@@ -25,7 +25,6 @@ import android.util.Log
 import android.view.Surface
 import java.nio.ByteBuffer
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 
 class HevcDecoder {
 
@@ -60,6 +59,12 @@ class HevcDecoder {
   @Volatile private var decoder: MediaCodec? = null
   @Volatile private var decoderThread: HandlerThread? = null
   private val incomingDataQueue = LinkedBlockingQueue<DecoderFrame>(DATA_QUEUE_CAPACITY)
+
+  // Input buffers the codec has offered that no frame has filled yet. Locked because activation
+  // and stop() clear it from outside the decoder thread: a codec reset invalidates every index.
+  private val availableInputBuffers = ArrayDeque<Int>()
+  @Volatile private var decoderHandler: Handler? = null
+  private val feedRunnable = Runnable { feedInputBuffers() }
 
   @Volatile private var mediaFormat: MediaFormat? = null
   @Volatile private var cachedVideoCodec: ByteBuffer? = null
@@ -128,7 +133,9 @@ class HevcDecoder {
 
   fun stop() {
     active = false
+    decoderHandler = null
     incomingDataQueue.clear()
+    synchronized(availableInputBuffers) { availableInputBuffers.clear() }
     try {
       decoder?.stop()
       decoder?.release()
@@ -195,7 +202,10 @@ class HevcDecoder {
       active = false
       return
     }
-    incomingDataQueue.offer(frame)
+    if (incomingDataQueue.offer(frame)) {
+      // An input buffer may already be waiting for this frame.
+      decoderHandler?.post(feedRunnable)
+    }
   }
 
   private fun ensureCodecsCreated() {
@@ -234,13 +244,17 @@ class HevcDecoder {
         val thread = HandlerThread("HevcDecoderThread", Process.THREAD_PRIORITY_VIDEO)
         thread.start()
         decoderThread = thread
+        synchronized(availableInputBuffers) { availableInputBuffers.clear() }
+        val handler = Handler(thread.looper)
+        decoderHandler = handler
 
         codec.reset()
         codec.configure(mediaFormat, outputSurface, null, 0)
         codec.setCallback(
             object : MediaCodec.Callback() {
               override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
-                onInputBuffer(codec, index)
+                synchronized(availableInputBuffers) { availableInputBuffers.addLast(index) }
+                feedInputBuffers()
               }
 
               override fun onOutputBufferAvailable(
@@ -258,7 +272,7 @@ class HevcDecoder {
               override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {}
             },
             // Deliver MediaCodec callbacks on our own decoder thread.
-            Handler(thread.looper),
+            handler,
         )
         codec.start()
       }
@@ -269,14 +283,35 @@ class HevcDecoder {
     }
   }
 
+  /**
+   * Pairs queued frames with free input buffers until either runs out, without ever waiting for
+   * one. The codec delivers decoded output on this same thread, so blocking here would hold every
+   * decoded frame back until the next frame arrived. Mirrors SDK AsyncFrameHandler.
+   */
+  private fun feedInputBuffers() {
+    val codec = decoder ?: return
+    while (true) {
+      // stop() clears this before releasing the codec, which it does from another thread.
+      if (decoderHandler == null) return
+      val (index, frame) =
+          synchronized(availableInputBuffers) {
+            if (availableInputBuffers.isEmpty()) {
+              null
+            } else {
+              incomingDataQueue.poll()?.let { availableInputBuffers.removeFirst() to it }
+            }
+          } ?: return
+      submit(codec, index, frame)
+    }
+  }
+
   // Mirrors VideoDecoderBufferHandler.onInputBuffer — feeds ENTIRE buffer with offset
-  private fun onInputBuffer(codec: MediaCodec, index: Int) {
+  private fun submit(codec: MediaCodec, index: Int, frame: DecoderFrame) {
     var bufferQueued = false
     try {
       val inputBuffer = codec.getInputBuffer(index)
-      val frame = incomingDataQueue.poll(1, TimeUnit.SECONDS)
 
-      if (frame == null || inputBuffer == null || !active) {
+      if (inputBuffer == null || !active) {
         codec.queueInputBuffer(index, 0, 0, 0, 0)
         bufferQueued = true
         return

@@ -16,7 +16,7 @@ kotlinxSerializationJson = "1.9.0"
 camerax = "1.6.1"
 mapsCompose = "6.4.1"
 playServicesMaps = "19.2.0"
-mwdat = "1.0.0"
+mwdat = "1.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

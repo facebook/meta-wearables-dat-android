@@ -32,7 +32,7 @@ Check the available versions on the [artifact page](https://central.sonatype.com
 
 ```toml
 [versions]
-mwdat = "1.0.0"
+mwdat = "1.0.1"
 
 [libraries]
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }

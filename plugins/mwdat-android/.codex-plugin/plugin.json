@@ -1,6 +1,6 @@
 {
   "name": "mwdat-android",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Git-native DAT SDK guidance for Android development.",
   "author": {
     "name": "Meta Wearables"

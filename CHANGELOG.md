@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The public API is covered by semantic versioning guarantees, but features labeled experimental may change between minor releases. They can be built and tested against, though apps using them cannot be published yet.
 
+## [1.0.1] - 2026-10-09
+
+### Fixed
+
+- Buffer corruption while streaming compressed HEVC buffers, causing sporadic frame freezes.
+- Several performance issues on `Stream` causing lag and stutter.
+
 ## [1.0.0] - 2026-09-24
 
 ### Added
